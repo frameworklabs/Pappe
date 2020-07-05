@@ -266,11 +266,32 @@ final class PappeTests: XCTestCase {
             }
         }.test(steps: 10)
     }
+    
+    func testLoc() {
+        let m = Module { name in
+            activity (name.Main, [name.in], [name.out]) { val in
+                loop {
+                    exec { val.out = val.in as Int * 2 }
+                    await { true }
+                }
+                nop
+            }
+            noAct
+        }
+        let p = m.makeProcessor()!
+        for i in 0..<3 {
+            let l = DirectLoc(val: 0)
+            try! p.tick([i], [l])
+            XCTAssertEqual(i * 2, l.val as! Int)
+        }
+    }
+    
     static var allTests = [
         ("testAwait", testAwait),
         ("testExit", testExit),
         ("testCobegin", testCobegin),
         ("testRepeat", testRepeat),
         ("testAbort", testAbort),
+        ("testLoc", testLoc),
     ]
 }

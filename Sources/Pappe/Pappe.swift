@@ -9,7 +9,18 @@ public enum Errors: Error {
     case exitNotAllowed
 }
 
-public struct Loc {
+public protocol Loc {
+    var val: Any { get set }
+}
+
+public class DirectLoc: Loc {
+    public var val: Any
+    init(val: Any) {
+        self.val = val
+    }
+}
+
+struct CtxLoc : Loc {
     let name: String
     var ctx: Ctx
     
@@ -28,7 +39,7 @@ public struct Locs {
     let ctx: Ctx
     
     public subscript(dynamicMember name: String) -> Loc {
-        return Loc(name: name, ctx: ctx)
+        return CtxLoc(name: name, ctx: ctx)
     }
 }
 
