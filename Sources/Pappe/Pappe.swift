@@ -15,7 +15,7 @@ public protocol Loc {
 
 public class DirectLoc: Loc {
     public var val: Any
-    init(val: Any) {
+    public init(val: Any) {
         self.val = val
     }
 }
