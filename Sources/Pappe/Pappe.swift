@@ -2,8 +2,9 @@
 // Copyright 2020, Framework Labs.
 
 import Foundation
+import Combine
 
-public enum Errors: Error {
+public enum Errors : Error {
     case varNotFound(String)
     case activityNotFound(String)
     case exitNotAllowed
@@ -13,7 +14,7 @@ public protocol Loc {
     var val: Any { get set }
 }
 
-public class DirectLoc: Loc {
+public class DirectLoc : Loc {
     public var val: Any
     public init(val: Any) {
         self.val = val
@@ -44,41 +45,17 @@ public struct Locs {
 }
 
 @dynamicMemberLookup
-public protocol Ctx {
-    var loc: Locs { get }
-    subscript<T>(dynamicMember name: String) -> T { get set }
-}
-
-@dynamicMemberLookup
-public class ProxyCtx : Ctx {
-    var targetCtx: Ctx!
-    
-    public var loc: Locs {
-        targetCtx.loc
-    }
-
-    public subscript<T>(dynamicMember name: String) -> T {
-        get {
-            return targetCtx[dynamicMember: name]
-        }
-        set {
-            targetCtx[dynamicMember: name] = newValue
-        }
-    }
-}
-
-@dynamicMemberLookup
-class RealCtx : Ctx {
+public class Ctx {
     let parent: Ctx?
     var map: [String: Any] = [:]
     
-    lazy var loc: Locs = Locs(ctx: self)
+    public lazy var loc: Locs = Locs(ctx: self)
     
     init(_ parent: Ctx? = nil) {
         self.parent = parent
     }
     
-    subscript<T>(dynamicMember name: String) -> T {
+    public subscript<T>(dynamicMember name: String) -> T {
         get {
             if let val = map[name] {
                 return val as! T
@@ -93,7 +70,7 @@ class RealCtx : Ctx {
                 map[name] = newValue
                 return
             }
-            if var p = parent {
+            if let p = parent {
                 p[dynamicMember: name] = newValue
             }
             map[name] = newValue
@@ -110,6 +87,8 @@ public struct ID {
 
 public typealias Proc = () -> Void
 public typealias Func = () -> Any
+public typealias LFunc = () -> Loc
+public typealias PFunc = (Receiver) -> Void
 public typealias MFunc = () -> [Any]
 public typealias MLFunc = () -> [Loc]
 public typealias Cond = () -> Bool
@@ -117,6 +96,7 @@ public typealias ResFunc = (Any?) -> Void
 
 public enum Stmt {
     case await(Cond)
+    case receive(LFunc, Any?, PFunc)
     case run(String, MFunc, MLFunc, ResFunc?)
     case cobegin([Trail])
     case repeatUntil([Stmt], Cond)
@@ -138,14 +118,17 @@ public struct Activity {
     let name: String
     let inParams: [String]
     let outParams: [String]
-    let stmts: [Stmt]
-    var ctx = ProxyCtx()
+    let builder: (Ctx) -> [Stmt]
     
-    init(name: String, inParams: [String], outParams: [String], @StmtBuilder builder: (ProxyCtx) -> [Stmt]) {
+    init(name: String, inParams: [String], outParams: [String], @StmtBuilder builder: @escaping (Ctx) -> [Stmt]) {
         self.name = name
         self.inParams = inParams
         self.outParams = outParams
-        self.stmts = builder(ctx)
+        self.builder = builder
+    }
+    
+    func makeStmts(_ ctx: Ctx) -> [Stmt] {
+        builder(ctx)
     }
 }
 
@@ -179,6 +162,10 @@ public struct ActivityBuilder {
 
 public func await(_ cond: @escaping Cond) -> Stmt {
     Stmt.await(cond)
+}
+
+public func receive(_ outArg: @autoclosure @escaping LFunc, resetTo value: Any? = nil, _ pfun: @escaping PFunc) -> Stmt {
+    Stmt.receive(outArg, value, pfun)
 }
 
 public func run(_ name: String, _ inArgs: @autoclosure @escaping MFunc, _ outArgs: @autoclosure @escaping MLFunc = [], res: ResFunc? = nil) -> Stmt {
@@ -262,8 +249,7 @@ public let noAct = activity ("__NoAct", []) { _ in
     nop
 }
 
-// Note: Ctx does not work for unknown reason, so using concrete type `ProxyCtx` instead.
-public func activity(_ name: String, _ inParams: [String], _ outParams: [String] = [], @StmtBuilder _ builder: (ProxyCtx) -> [Stmt]) -> Activity
+public func activity(_ name: String, _ inParams: [String], _ outParams: [String] = [], @StmtBuilder _ builder: @escaping (Ctx) -> [Stmt]) -> Activity
 {
     return Activity(name: name, inParams: inParams, outParams: outParams, builder: builder)
 }
@@ -309,19 +295,132 @@ extension TickResult : Equatable {
     }
 }
 
-public class Processor {
-    let ap: ActivityProcessor
+public protocol Receiver : class {
+    var box: Any? { get set }
+
+    func postValue(_ val: Any)
+    func postDone()
+    func react()
+}
+
+public struct ReceiveCtx {
+    let queue: DispatchQueue
+    let trigger: Proc
+}
+
+class ProcessorCtx {
+    let module: Module
+    var receiveCtx: ReceiveCtx?
     
+    init(module: Module) {
+        self.module = module
+    }
+}
+
+public class Processor {
+    let procCtx: ProcessorCtx
+    let ap: ActivityProcessor
+
     public init(module: Module, entryPoint: String = "Main") throws {
         guard let a = module[entryPoint] else {
             throw Errors.activityNotFound(entryPoint)
         }
-        ap = ActivityProcessor(act: a, mod: module)
+        procCtx = ProcessorCtx(module: module)
+        ap = ActivityProcessor(act: a, procCtx: procCtx)
     }
     
     @discardableResult
     public func tick(_ inArgs: [Any], _ outArgs: [Loc]) throws -> TickResult {
-        try ap.tick(inArgs, outArgs)
+        return try ap.tick(inArgs, outArgs)
+    }
+    
+    var receiveCtx: ReceiveCtx? {
+        get {
+            return procCtx.receiveCtx
+        }
+        set {
+            procCtx.receiveCtx = newValue
+        }
+    }
+}
+
+public enum VarBehavior {
+    case persist
+    case reset
+}
+
+public struct VarConfig {
+    public let name: String
+    public let value: Any
+    public let behavior: VarBehavior
+    
+    public init(_ n: String, _ v: Any, _ b: VarBehavior = .persist) {
+        name = n
+        value = v
+        behavior = b
+    }
+}
+
+@dynamicMemberLookup
+public class Reactor {
+    public typealias ReactCallback = (TickResult) -> Void
+
+    let inConfig: [VarConfig]
+    let inOutConfig: [VarConfig]
+
+    let proc: Processor
+    var cb: ReactCallback?
+    var vars: [String: Any] = [:]
+        
+    public init(module: Module, entryPoint: String = "Main", inConfig: [VarConfig], inOutConfig: [VarConfig], queue: DispatchQueue = .main) throws {
+        self.inConfig = inConfig
+        self.inOutConfig = inOutConfig
+        
+        proc = try Processor(module: module, entryPoint: entryPoint)
+        proc.receiveCtx = ReceiveCtx(queue: queue) {
+            let vals = inConfig.map { cfg in self.vars[cfg.name]! }
+            let locs = inOutConfig.map { cfg in DirectLoc(val: self.vars[cfg.name]!) }
+            
+            let res = try! self.proc.tick(vals, locs)
+            
+            for (cfg, loc) in zip(inOutConfig, locs) {
+                self.vars[cfg.name] = loc.val
+            }
+            
+            self.reactCallback?(res)
+
+            for cfg in inConfig + inOutConfig {
+                if cfg.behavior == .reset {
+                    self.vars[cfg.name] = cfg.value
+                }
+            }
+        }
+        
+        for cfg in inConfig + inOutConfig {
+            vars[cfg.name] = cfg.value
+        }
+    }
+    
+    public subscript(dynamicMember name: String) -> Any {
+        get {
+            return vars[name]!
+        }
+        set {
+            vars[name] = newValue
+        }
+    }
+    
+    public func react() {
+        proc.receiveCtx?.trigger()
+    }
+    
+    public var reactCallback: ReactCallback? {
+        get {
+            return cb
+        }
+        set {
+            cb = newValue
+        }
     }
 }
 
@@ -332,17 +431,17 @@ extension Module {
 }
 
 extension Activity {
-    func bindInArgs(_ inArgs: [Any]) {
+    func bindInArgs(_ inArgs: [Any], _ ctx: Ctx) {
         for (p, a) in zip(inParams, inArgs) {
             ctx[dynamicMember: p] = a
         }
     }
-    func bindInOutArgs(_ outArgs: [Loc]) {
+    func bindInOutArgs(_ outArgs: [Loc], _ ctx: Ctx) {
         for (p, l) in zip(outParams, outArgs) {
             ctx[dynamicMember: p] = l.val
         }
     }
-    func bindOutArgs(_ outArgs: [Loc]) {
+    func bindOutArgs(_ outArgs: [Loc], _ ctx: Ctx) {
         for (p, var l) in zip(outParams, outArgs) {
             l.val = ctx[dynamicMember: p]
         }
@@ -352,19 +451,18 @@ extension Activity {
 class ActivityProcessor {
     let act: Activity
     let bp: BlockProcessor
-    let ctx = RealCtx()
+    let ctx = Ctx()
     
-    init(act: Activity, mod: Module) {
+    init(act: Activity, procCtx: ProcessorCtx) {
         self.act = act
-        bp = BlockProcessor(stmts: act.stmts, mod: mod)
+        bp = BlockProcessor(stmts: act.makeStmts(ctx), procCtx: procCtx)
     }
     
     func tick(_ inArgs: [Any], _ outArgs: [Loc]) throws -> TickResult {
-        act.ctx.targetCtx = ctx
-        act.bindInArgs(inArgs)
-        act.bindInOutArgs(outArgs)
+        act.bindInArgs(inArgs, ctx)
+        act.bindInOutArgs(outArgs, ctx)
         let res = try bp.tick()
-        act.bindOutArgs(outArgs)
+        act.bindOutArgs(outArgs, ctx)
         return res
     }
 }
@@ -377,14 +475,14 @@ extension Int {
 
 class BlockProcessor {
     let stmts: [Stmt]
-    let mod: Module
+    let procCtx: ProcessorCtx
     var pc: Int = 0
     
     var subProc: Any?
     
-    init(stmts: [Stmt], mod: Module) {
+    init(stmts: [Stmt], procCtx: ProcessorCtx) {
         self.stmts = stmts
-        self.mod = mod
+        self.procCtx = procCtx
     }
     
     func reset() {
@@ -407,12 +505,24 @@ class BlockProcessor {
                 subProc = nil
                 pc.inc()
                 
+            case let .receive(outLoc, resetValue, pFunc):
+                if subProc == nil {
+                    subProc = ReceiveProcessor(outLoc: outLoc(), resetValue: resetValue, pFunc: pFunc, procCtx: procCtx)
+                }
+                let res = (subProc as! ReceiveProcessor).tick()
+                if res == .wait {
+                    return res
+                }
+                assert(res == .done)
+                subProc = nil
+                pc.inc()
+                
             case let .run(a, inArgs, outArgs, resFunc):
-                guard let act = mod[a] else {
+                guard let act = procCtx.module[a] else {
                     throw Errors.activityNotFound(a)
                 }
                 if subProc == nil {
-                    subProc = ActivityProcessor(act: act, mod: mod)
+                    subProc = ActivityProcessor(act: act, procCtx: procCtx)
                 }
                 let res = try (subProc as! ActivityProcessor).tick(inArgs(), outArgs())
                 if res == .wait {
@@ -426,7 +536,7 @@ class BlockProcessor {
 
             case let .repeatUntil(ss, c):
                 if subProc == nil {
-                    subProc = WhileProcessor(cond: c, stmts: ss, mod: mod)
+                    subProc = WhileProcessor(cond: c, stmts: ss, procCtx: procCtx)
                 }
                 let res = try (subProc as! WhileProcessor).tick()
                 if res == .wait {
@@ -441,7 +551,7 @@ class BlockProcessor {
 
             case let .cobegin(ts):
                 if subProc == nil {
-                    subProc = CobeginProcessor(trails: ts, mod: mod)
+                    subProc = CobeginProcessor(trails: ts, procCtx: procCtx)
                 }
                 let res = try (subProc as! CobeginProcessor).tick()
                 if res == .wait {
@@ -453,7 +563,7 @@ class BlockProcessor {
 
             case let .match(conds):
                 if subProc == nil {
-                    subProc = MatchProcessor(conds: conds, mod: mod)
+                    subProc = MatchProcessor(conds: conds, procCtx: procCtx)
                 }
                 let res = try (subProc as! MatchProcessor).tick()
                 if res == .wait {
@@ -468,7 +578,7 @@ class BlockProcessor {
 
             case let .whenAbort(cond, stmts):
                 if subProc == nil {
-                    subProc = AbortProcessor(cond: cond, stmts: stmts, mod: mod)
+                    subProc = AbortProcessor(cond: cond, stmts: stmts, procCtx: procCtx)
                 }
                 let res = try (subProc as! AbortProcessor).tick()
                 if res == .wait {
@@ -513,16 +623,62 @@ class AwaitProcessor {
     }
 }
 
+class ReceiveProcessor : Receiver {    
+    var outLoc: Loc
+    let resetValue: Any?
+    let procCtx: ProcessorCtx
+    var val: Any?
+    var res: TickResult = .wait
+    var box: Any?
+
+    init(outLoc: Loc, resetValue: Any?, pFunc: PFunc, procCtx: ProcessorCtx) {
+        self.outLoc = outLoc
+        self.resetValue = resetValue
+        self.procCtx = procCtx
+        pFunc(self)
+    }
+    
+    func tick() -> TickResult {
+        if let val = val {
+            outLoc.val = val
+            self.val = nil
+        } else {
+            if let resetVal = resetValue {
+                outLoc.val = resetVal
+            }
+        }
+        return res
+    }
+    
+    func postValue(_ val: Any) {
+        procCtx.receiveCtx?.queue.async {
+            self.val = val
+        }
+    }
+    
+    func postDone() {
+        procCtx.receiveCtx?.queue.async {
+            self.res = .done
+        }
+    }
+    
+    func react() {
+        procCtx.receiveCtx?.queue.async {
+            self.procCtx.receiveCtx?.trigger()
+        }
+    }
+}
+
 class CobeginProcessor {
     let tps: [TrailProcessor]
     
-    init(trails: [Trail], mod: Module) {
+    init(trails: [Trail], procCtx: ProcessorCtx) {
         tps = trails.map { trail in
             switch trail {
             case .strong(let ss):
-                return TrailProcessor(stmts: ss, mod: mod, strong: true)
+                return TrailProcessor(stmts: ss, procCtx: procCtx, strong: true)
             case .weak(let ss):
-                return TrailProcessor(stmts: ss, mod: mod, strong: false)
+                return TrailProcessor(stmts: ss, procCtx: procCtx, strong: false)
             }
         }
     }
@@ -531,6 +687,7 @@ class CobeginProcessor {
         var doneStrong = 0
         var doneWeak = 0
         var numStrong = 0
+        
         for tp in tps {
             let res = try tp.tick()
             if res == .done {
@@ -547,16 +704,16 @@ class CobeginProcessor {
                 numStrong += 1
             }
         }
-        return doneStrong == numStrong || (doneWeak > 0 && numStrong == 0) ? .done : .wait
+        return (doneStrong == numStrong && numStrong > 0) || (doneWeak > 0 && numStrong == 0) ? .done : .wait
     }
 }
 
-class TrailProcessor: BlockProcessor {
+class TrailProcessor : BlockProcessor {
     let strong: Bool
     
-    init(stmts: [Stmt], mod: Module, strong: Bool) {
+    init(stmts: [Stmt], procCtx: ProcessorCtx, strong: Bool) {
         self.strong = strong
-        super.init(stmts: stmts, mod: mod)
+        super.init(stmts: stmts, procCtx: procCtx)
     }
 }
 
@@ -564,9 +721,9 @@ class WhileProcessor {
     let c: Cond
     let bp: BlockProcessor
     
-    init(cond: @escaping Cond, stmts: [Stmt], mod: Module) {
+    init(cond: @escaping Cond, stmts: [Stmt], procCtx: ProcessorCtx) {
         c = cond
-        bp = BlockProcessor(stmts: stmts, mod: mod)
+        bp = BlockProcessor(stmts: stmts, procCtx: procCtx)
     }
     
     func tick() throws -> TickResult {
@@ -588,9 +745,9 @@ class AbortProcessor {
     let bp: BlockProcessor
     var check = false
     
-    init(cond: @escaping Cond, stmts: [Stmt], mod: Module) {
+    init(cond: @escaping Cond, stmts: [Stmt], procCtx: ProcessorCtx) {
         c = cond
-        bp = BlockProcessor(stmts: stmts, mod: mod)
+        bp = BlockProcessor(stmts: stmts, procCtx: procCtx)
     }
     
     func tick() throws -> TickResult {
@@ -608,10 +765,10 @@ class AbortProcessor {
 class MatchProcessor {
     let bp: BlockProcessor?
     
-    init(conds: [Conditional], mod: Module) {
+    init(conds: [Conditional], procCtx: ProcessorCtx) {
         for (cond, stmts) in conds {
             if cond() {
-                bp = BlockProcessor(stmts: stmts, mod: mod)
+                bp = BlockProcessor(stmts: stmts, procCtx: procCtx)
                 return
             }
         }
@@ -624,4 +781,69 @@ class MatchProcessor {
         }
         return try bp.tick()
     }
+}
+
+// MARK: - Combine extensions
+
+@available(OSX 10.15, *)
+public extension Reactor {
+    func publisher(for v: String) -> AnyPublisher<Any, Never> {
+        let res = PassthroughSubject<Any, Never>()
+        let oldCB = reactCallback
+        reactCallback = { tr in
+            oldCB?(tr)
+            res.send(self[dynamicMember: v])
+            switch tr {
+            case .done, .result(_):
+                res.send(completion: .finished)
+            default:
+                break
+            }
+        }
+        return res.eraseToAnyPublisher()
+    }
+}
+
+@available(OSX 10.15, *)
+public extension Receiver {
+    func connect(_ p: AnyPublisher<Any, Never>, reactOnValue: Bool = true, reactOnCompletion: Bool = true) {
+        box = p.sink(receiveCompletion: { [weak self] _ in
+            self?.postDone()
+            if reactOnCompletion {
+                self?.react()
+            }
+        }, receiveValue: { [weak self] val in
+            self?.postValue(val)
+            if reactOnValue {
+                self?.react()
+            }
+        })
+    }
+}
+
+@available(OSX 10.15, *)
+public func receive(_ outArg: @autoclosure @escaping LFunc, resetTo value: Any? = nil, reactOnValue: @autoclosure @escaping () -> Bool = true, reactOnCompletion: @autoclosure @escaping () -> Bool = true, _ pub: @escaping () -> AnyPublisher<Any, Never>) -> Stmt {
+    receive(outArg(), resetTo: value) { rcv in
+        rcv.connect(pub(), reactOnValue: reactOnValue(), reactOnCompletion: reactOnCompletion())
+    }
+}
+
+@available(OSX 10.15, *)
+public extension Publisher {
+    func eraseTotally() -> AnyPublisher<Any, Self.Failure> {
+        self.map { $0 as Any }.eraseToAnyPublisher()
+    }
+}
+
+// MARK: - Standard Modules
+
+@available(OSX 10.15, *)
+public let clockModule = Module { name in
+    activity (name.Clock, [name.interval, name.shouldReact]) { val in
+        exec { val.tick = false }
+        receive (val.loc.tick, resetTo: false, reactOnValue: val.shouldReact as Bool) {
+            Timer.publish(every: val.interval, on: .main, in: .default).autoconnect().map { _ in return true }.eraseToAnyPublisher()
+        }
+    }
+    noAct
 }
