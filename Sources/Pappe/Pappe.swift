@@ -1,8 +1,7 @@
-// Pappe
+// Project Pappe
 // Copyright 2020, Framework Labs.
 
 import Foundation
-import Combine
 
 public enum Errors : Error {
     case varNotFound(String)
@@ -340,86 +339,6 @@ public class Processor {
         }
         set {
             procCtx.receiveCtx = newValue
-        }
-    }
-}
-
-public enum VarBehavior {
-    case persist
-    case reset
-}
-
-public struct VarConfig {
-    public let name: String
-    public let value: Any
-    public let behavior: VarBehavior
-    
-    public init(_ n: String, _ v: Any, _ b: VarBehavior = .persist) {
-        name = n
-        value = v
-        behavior = b
-    }
-}
-
-@dynamicMemberLookup
-public class Reactor {
-    public typealias ReactCallback = (TickResult) -> Void
-
-    let inConfig: [VarConfig]
-    let inOutConfig: [VarConfig]
-
-    let proc: Processor
-    var cb: ReactCallback?
-    var vars: [String: Any] = [:]
-        
-    public init(module: Module, entryPoint: String = "Main", inConfig: [VarConfig], inOutConfig: [VarConfig], queue: DispatchQueue = .main) throws {
-        self.inConfig = inConfig
-        self.inOutConfig = inOutConfig
-        
-        proc = try Processor(module: module, entryPoint: entryPoint)
-        proc.receiveCtx = ReceiveCtx(queue: queue) {
-            let vals = inConfig.map { cfg in self.vars[cfg.name]! }
-            let locs = inOutConfig.map { cfg in DirectLoc(val: self.vars[cfg.name]!) }
-            
-            let res = try! self.proc.tick(vals, locs)
-            
-            for (cfg, loc) in zip(inOutConfig, locs) {
-                self.vars[cfg.name] = loc.val
-            }
-            
-            self.reactCallback?(res)
-
-            for cfg in inConfig + inOutConfig {
-                if cfg.behavior == .reset {
-                    self.vars[cfg.name] = cfg.value
-                }
-            }
-        }
-        
-        for cfg in inConfig + inOutConfig {
-            vars[cfg.name] = cfg.value
-        }
-    }
-    
-    public subscript(dynamicMember name: String) -> Any {
-        get {
-            return vars[name]!
-        }
-        set {
-            vars[name] = newValue
-        }
-    }
-    
-    public func react() {
-        proc.receiveCtx?.trigger()
-    }
-    
-    public var reactCallback: ReactCallback? {
-        get {
-            return cb
-        }
-        set {
-            cb = newValue
         }
     }
 }
@@ -781,69 +700,4 @@ class MatchProcessor {
         }
         return try bp.tick()
     }
-}
-
-// MARK: - Combine extensions
-
-@available(OSX 10.15, *)
-public extension Reactor {
-    func publisher(for v: String) -> AnyPublisher<Any, Never> {
-        let res = PassthroughSubject<Any, Never>()
-        let oldCB = reactCallback
-        reactCallback = { tr in
-            oldCB?(tr)
-            res.send(self[dynamicMember: v])
-            switch tr {
-            case .done, .result(_):
-                res.send(completion: .finished)
-            default:
-                break
-            }
-        }
-        return res.eraseToAnyPublisher()
-    }
-}
-
-@available(OSX 10.15, *)
-public extension Receiver {
-    func connect(_ p: AnyPublisher<Any, Never>, reactOnValue: Bool = true, reactOnCompletion: Bool = true) {
-        box = p.sink(receiveCompletion: { [weak self] _ in
-            self?.postDone()
-            if reactOnCompletion {
-                self?.react()
-            }
-        }, receiveValue: { [weak self] val in
-            self?.postValue(val)
-            if reactOnValue {
-                self?.react()
-            }
-        })
-    }
-}
-
-@available(OSX 10.15, *)
-public func receive(_ outArg: @autoclosure @escaping LFunc, resetTo value: Any? = nil, reactOnValue: @autoclosure @escaping () -> Bool = true, reactOnCompletion: @autoclosure @escaping () -> Bool = true, _ pub: @escaping () -> AnyPublisher<Any, Never>) -> Stmt {
-    receive(outArg(), resetTo: value) { rcv in
-        rcv.connect(pub(), reactOnValue: reactOnValue(), reactOnCompletion: reactOnCompletion())
-    }
-}
-
-@available(OSX 10.15, *)
-public extension Publisher {
-    func eraseTotally() -> AnyPublisher<Any, Self.Failure> {
-        self.map { $0 as Any }.eraseToAnyPublisher()
-    }
-}
-
-// MARK: - Standard Modules
-
-@available(OSX 10.15, *)
-public let clockModule = Module { name in
-    activity (name.Clock, [name.interval, name.shouldReact]) { val in
-        exec { val.tick = false }
-        receive (val.loc.tick, resetTo: false, reactOnValue: val.shouldReact as Bool) {
-            Timer.publish(every: val.interval, on: .main, in: .default).autoconnect().map { _ in return true }.eraseToAnyPublisher()
-        }
-    }
-    noAct
 }
