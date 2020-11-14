@@ -19,6 +19,4 @@ The Pappe DSL is more of a proof of concept. It has many shortcommings like:
 * No causality checking.
 * Interpreted instead of compiled.
 * Untyped and unchecked variables.
-* The way Swift functionBuilders are used requires always at least 2 statements - hence many ugly nop statements.
-* FunctionBuilder support for if statements not used.
 * Poor Test coverage.

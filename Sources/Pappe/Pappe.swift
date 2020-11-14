@@ -103,7 +103,6 @@ public enum Stmt {
     case match([Conditional])
     case exec(Proc)
     case exit(Func)
-    case nop
 }
 
 public enum Trail {
@@ -191,7 +190,6 @@ public func weak(@StmtBuilder builder: () -> [Stmt]) -> Trail {
 public func whileRepeat(_ cond: @autoclosure @escaping Cond, @StmtBuilder builder: () -> [Stmt]) -> Stmt {
     when (cond()) {
         repeatUntil(builder, !cond())
-        nop
     }
 }
 
@@ -241,18 +239,12 @@ public func exit(_ f: @escaping Func) -> Stmt {
     Stmt.exit(f)
 }
 
-public let nop = Stmt.nop
-
-public let noAct = activity ("__NoAct", []) { _ in
-    nop
-    nop
-}
-
 public func activity(_ name: String, _ inParams: [String], _ outParams: [String] = [], @StmtBuilder _ builder: @escaping (Ctx) -> [Stmt]) -> Activity
 {
     return Activity(name: name, inParams: inParams, outParams: outParams, builder: builder)
 }
 
+@available(swift 5.3)
 public class Module {
     public typealias Import = Module
     
@@ -516,9 +508,6 @@ class BlockProcessor {
                 
             case .exit(let f):
                 return .result(f())
-
-            case .nop:
-                pc.inc()
             }
         }
         return .done

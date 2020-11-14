@@ -12,6 +12,4 @@ public let clockModule = Module { name in
             Timer.publish(every: val.interval, on: .main, in: .default).autoconnect().map { _ in return true }.eraseToAnyPublisher()
         }
     }
-    
-    noAct
 }

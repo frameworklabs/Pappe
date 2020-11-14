@@ -24,7 +24,6 @@ final class PappeTests: XCTestCase {
                 await { true }
             }
         }
-        noAct
     }
     
     func testAwait() {
@@ -64,14 +63,12 @@ final class PappeTests: XCTestCase {
                     }
                     weak {
                         doRun (name.Test, [val.in1, val.in2], [val.loc.out])
-                        nop
                     }
                     weak {
                         loop {
                             exec { XCTAssertEqual(val.out as Bool, val.expect) }
                             await { true }
                         }
-                        nop
                     }
                 }
             }
@@ -92,9 +89,7 @@ final class PappeTests: XCTestCase {
                         exit { val.tmp }
                         await { false }
                     }
-                    nop
                 }
-                nop
             }
             activity (name.Main, []) { val in
                 exec { val.out = 0 }
@@ -107,14 +102,12 @@ final class PappeTests: XCTestCase {
                     }
                     weak {
                         doRun (name.Test, []) { res in val.out = res }
-                        nop
                     }
                     weak {
                         loop {
                             exec { XCTAssertEqual(val.out as Int, val.expect) }
                             await { true }
                         }
-                        nop
                     }
                 }
             }
@@ -127,23 +120,18 @@ final class PappeTests: XCTestCase {
                 cobegin {
                     strong {
                         doRun (name.Delay, [1])
-                        nop
                     }
                     strong {
                         doRun (name.Delay, [3])
-                        nop
                     }
                     strong {
                         doRun (name.Delay, [2])
-                        nop
                     }
                     weak {
                         doRun (name.Delay, [2])
-                        nop
                     }
                     weak {
                         doRun (name.Delay, [4])
-                        nop
                     }
                 }
                 exec { val.done = true }
@@ -162,14 +150,12 @@ final class PappeTests: XCTestCase {
                     }
                     weak {
                         doRun (name.Test, [], [val.loc.out])
-                        nop
                     }
                     weak {
                         loop {
                             exec { XCTAssertEqual(val.out as Bool, val.expect) }
                             await { true }
                         }
-                        nop
                     }
                 }
             }
@@ -211,11 +197,9 @@ final class PappeTests: XCTestCase {
                     }
                     weak {
                         doRun (name.TestRepeatUntil, [], [val.loc.outRepeatUntil])
-                        nop
                     }
                     weak {
                         doRun (name.TestWhileRepeat, [], [val.loc.outWhileRepeat])
-                        nop
                     }
                     weak {
                         loop {
@@ -225,7 +209,6 @@ final class PappeTests: XCTestCase {
                             }
                             await { true }
                         }
-                        nop
                     }
                 }
             }
@@ -253,14 +236,12 @@ final class PappeTests: XCTestCase {
                     }
                     weak {
                         doRun (name.Test, [], [val.loc.out])
-                        nop
                     }
                     weak {
                         loop {
                             exec { XCTAssertEqual(val.out as Int, val.expect) }
                             await { true }
                         }
-                        nop
                     }
                 }
             }
@@ -274,9 +255,7 @@ final class PappeTests: XCTestCase {
                     exec { val.out = val.in as Int * 2 }
                     await { true }
                 }
-                nop
             }
-            noAct
         }
         let p = m.makeProcessor()!
         for i in 0..<3 {
