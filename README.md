@@ -14,28 +14,28 @@ In this usage example three trails run concurrently for 10 ticks as determined b
 
 ```swift
 let m = Module { name in
-    activity (name.Count, [name.ticks]) { val in
-        exec { val.count = val.ticks as Int }
-        whileRepeat(val.count > 1) {
-            exec { val.count = val.count - 1 }
+    activity (name.Wait, [name.ticks]) { val in
+        exec { val.i = val.ticks as Int }
+        whileRepeat(val.i > 0) {
+            exec { val.i -= 1 }
             await { true }
         }
     }
     activity (name.Main, []) { val in
         cobegin {
             strong {
-                doRun(name.Count, [10])
+                doRun(name.Wait, [10])
             }
             weak {
                 loop {
-                    doRun(name.Count, [3])
+                    doRun(name.Wait, [2])
                     exec { print("on every third") }
                     await { true }
                 }
             }
             weak {
                 loop {
-                    doRun(name.Count, [2])
+                    doRun(name.Wait, [1])
                     exec { print("on every second") }
                     await { true }
                 }
