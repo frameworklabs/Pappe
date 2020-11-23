@@ -1,7 +1,7 @@
 // Project Pappe
 // Copyright 2020, Framework Labs.
 
-import Foundation
+import Dispatch
 
 public enum Errors : Error {
     case varNotFound(String)
@@ -166,68 +166,49 @@ public func receive(_ outArg: @autoclosure @escaping LFunc, resetTo value: Any? 
     Stmt.receive(outArg, value, pfun)
 }
 
-public func run(_ name: String, _ inArgs: @autoclosure @escaping MFunc, _ outArgs: @autoclosure @escaping MLFunc = [], res: ResFunc? = nil) -> Stmt {
+public func run(_ name: String, _ inArgs: @autoclosure @escaping MFunc, _ outArgs: @autoclosure @escaping MLFunc = [], _ res: ResFunc? = nil) -> Stmt {
     Stmt.run(name, inArgs, outArgs, res)
 }
 
-// Alternative name for run
-public func doRun(_ name: String, _ inArgs: @autoclosure @escaping MFunc, _ outArgs: @autoclosure @escaping MLFunc = [], res: ResFunc? = nil) -> Stmt {
-    run(name, inArgs(), outArgs(), res: res)
-}
-
-public func cobegin(@TrailBuilder builder: () -> [Trail]) -> Stmt {
+public func cobegin(@TrailBuilder _ builder: () -> [Trail]) -> Stmt {
     Stmt.cobegin(builder())
 }
 
-public func strong(@StmtBuilder builder: () -> [Stmt]) -> Trail {
+public func strong(@StmtBuilder _ builder: () -> [Stmt]) -> Trail {
     Trail.strong(builder())
 }
 
-public func weak(@StmtBuilder builder: () -> [Stmt]) -> Trail {
+public func weak(@StmtBuilder _ builder: () -> [Stmt]) -> Trail {
     Trail.weak(builder())
 }
 
-public func whileRepeat(_ cond: @autoclosure @escaping Cond, @StmtBuilder builder: () -> [Stmt]) -> Stmt {
-    when (cond()) {
-        repeatUntil(builder, !cond())
+public func `while`(_ cond: @escaping Cond, @StmtBuilder repeat builder: () -> [Stmt]) -> Stmt {
+    `if` { cond() } then: {
+        `repeat`(builder, until: {!cond()})
     }
 }
 
-public func `repeat`(@StmtBuilder builder: () -> [Stmt]) -> Stmt {
-    return repeatUntil(builder, false)
+public func `repeat`(@StmtBuilder _ builder: () -> [Stmt]) -> Stmt {
+    return Stmt.repeatUntil(builder(), { false })
 }
 
-public func repeatUntil(@StmtBuilder _ builder: () -> [Stmt], _ cond: @autoclosure @escaping Cond) -> Stmt {
+public func `repeat`(@StmtBuilder _ builder: () -> [Stmt], until cond: @escaping Cond) -> Stmt {
     return Stmt.repeatUntil(builder(), cond)
 }
 
-// Begin alternaive names for repeat.
-public func whileLoop(_ cond: @autoclosure @escaping Cond, @StmtBuilder builder: () -> [Stmt]) -> Stmt {
-    whileRepeat(cond(), builder: builder)
-}
-
-public func loop(@StmtBuilder builder: () -> [Stmt]) -> Stmt {
-    `repeat`(builder: builder)
-}
-
-public func loopUntil(@StmtBuilder _ builder: () -> [Stmt], _ cond: @autoclosure @escaping Cond) -> Stmt {
-    repeatUntil(builder, cond())
-}
-// End alternative names.
-
-public func whenAbort(_ cond: @autoclosure @escaping Cond, @StmtBuilder builder: () -> [Stmt]) -> Stmt {
+public func when(_ cond: @escaping Cond, @StmtBuilder abort builder: () -> [Stmt]) -> Stmt {
     Stmt.whenAbort(cond, builder())
 }
 
-public func match(@ConditionalBuilder builder: () -> [Conditional]) -> Stmt {
+public func match(@ConditionalBuilder _ builder: () -> [Conditional]) -> Stmt {
     Stmt.match(builder())
 }
 
-public func cond(_ cond: @autoclosure @escaping Cond, @StmtBuilder builder: () -> [Stmt]) -> Conditional {
+public func cond(_ cond: @escaping Cond, @StmtBuilder then builder: () -> [Stmt]) -> Conditional {
     (cond, builder())
 }
 
-public func when(_ cond: @autoclosure @escaping Cond, @StmtBuilder builder: () -> [Stmt]) -> Stmt {
+public func `if`(_ cond: @escaping Cond, @StmtBuilder then builder: () -> [Stmt]) -> Stmt {
     Stmt.match([(cond, builder())])
 }
 

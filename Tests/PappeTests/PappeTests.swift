@@ -19,7 +19,7 @@ final class PappeTests: XCTestCase {
     let common = Module { name in
         activity (name.Delay, [name.ticks]) { val in
             exec { val.i = val.ticks as Int }
-            whileRepeat (val.i > 0) {
+            `while` { val.i > 0 } `repeat`: {
                 exec { val.i -= 1 }
                 await { true }
             }
@@ -62,10 +62,10 @@ final class PappeTests: XCTestCase {
                         }
                     }
                     weak {
-                        doRun (name.Test, [val.in1, val.in2], [val.loc.out])
+                        Pappe.run (name.Test, [val.in1, val.in2], [val.loc.out])
                     }
                     weak {
-                        loop {
+                        `repeat` {
                             exec { XCTAssertEqual(val.out as Bool, val.expect) }
                             await { true }
                         }
@@ -82,10 +82,10 @@ final class PappeTests: XCTestCase {
                 await { false }
             }
             activity (name.Test, []) { val in
-                whenAbort (false) {
-                    loop {
+                when { false } abort: {
+                    `repeat` {
                         await { true }
-                        doRun (name.Inner, []) { res in val.tmp = res }
+                        Pappe.run  (name.Inner, []) { res in val.tmp = res }
                         exit { val.tmp }
                         await { false }
                     }
@@ -101,10 +101,10 @@ final class PappeTests: XCTestCase {
                         await { true }
                     }
                     weak {
-                        doRun (name.Test, []) { res in val.out = res }
+                        Pappe.run  (name.Test, []) { res in val.out = res }
                     }
                     weak {
-                        loop {
+                        `repeat` {
                             exec { XCTAssertEqual(val.out as Int, val.expect) }
                             await { true }
                         }
@@ -119,19 +119,19 @@ final class PappeTests: XCTestCase {
             activity (name.Test, [], [name.done]) { val in
                 cobegin {
                     strong {
-                        doRun (name.Delay, [1])
+                        Pappe.run (name.Delay, [1])
                     }
                     strong {
-                        doRun (name.Delay, [3])
+                        Pappe.run (name.Delay, [3])
                     }
                     strong {
-                        doRun (name.Delay, [2])
+                        Pappe.run (name.Delay, [2])
                     }
                     weak {
-                        doRun (name.Delay, [2])
+                        Pappe.run (name.Delay, [2])
                     }
                     weak {
-                        doRun (name.Delay, [4])
+                        Pappe.run (name.Delay, [4])
                     }
                 }
                 exec { val.done = true }
@@ -149,10 +149,10 @@ final class PappeTests: XCTestCase {
                         exec { val.expect = true }
                     }
                     weak {
-                        doRun (name.Test, [], [val.loc.out])
+                        Pappe.run (name.Test, [], [val.loc.out])
                     }
                     weak {
-                        loop {
+                        `repeat` {
                             exec { XCTAssertEqual(val.out as Bool, val.expect) }
                             await { true }
                         }
@@ -166,15 +166,15 @@ final class PappeTests: XCTestCase {
         Module { name in
             activity (name.TestRepeatUntil, [], [name.done]) { val in
                 exec { val.i = 3 }
-                repeatUntil ({
+                `repeat` {
                     exec { val.i -= 1 }
                     await { true }
-                }, val.i == 0)
+                } until: { val.i == 0 }
                 exec { val.done = true }
             }
             activity (name.TestWhileRepeat, [], [name.done]) { val in
                 exec { val.i = 3 }
-                whileRepeat (val.i > 0) {
+                `while` { val.i > 0 } repeat: {
                     exec { val.i -= 1 }
                     await { true }
                 }
@@ -196,13 +196,13 @@ final class PappeTests: XCTestCase {
                         exec { val.expect = true }
                     }
                     weak {
-                        doRun (name.TestRepeatUntil, [], [val.loc.outRepeatUntil])
+                        Pappe.run (name.TestRepeatUntil, [], [val.loc.outRepeatUntil])
                     }
                     weak {
-                        doRun (name.TestWhileRepeat, [], [val.loc.outWhileRepeat])
+                        Pappe.run (name.TestWhileRepeat, [], [val.loc.outWhileRepeat])
                     }
                     weak {
-                        loop {
+                        `repeat` {
                             exec {
                                 XCTAssertEqual(val.outRepeatUntil as Bool, val.expect)
                                 XCTAssertEqual(val.outWhileRepeat as Bool, val.expect)
@@ -218,7 +218,7 @@ final class PappeTests: XCTestCase {
     func testAbort() {
         Module(imports: [common]) { name in
             activity (name.Test, [], [name.pos]) { val in
-                whenAbort (true) {
+                when { true } abort: {
                     exec { val.pos = 1 }
                     await { true }
                     exec { val.pos = 2 }
@@ -235,10 +235,10 @@ final class PappeTests: XCTestCase {
                         exec { val.expect = 3 }
                     }
                     weak {
-                        doRun (name.Test, [], [val.loc.out])
+                        Pappe.run (name.Test, [], [val.loc.out])
                     }
                     weak {
-                        loop {
+                        `repeat` {
                             exec { XCTAssertEqual(val.out as Int, val.expect) }
                             await { true }
                         }
@@ -251,7 +251,7 @@ final class PappeTests: XCTestCase {
     func testLoc() {
         let m = Module { name in
             activity (name.Main, [name.in], [name.out]) { val in
-                loop {
+                `repeat` {
                     exec { val.out = val.in as Int * 2 }
                     await { true }
                 }
