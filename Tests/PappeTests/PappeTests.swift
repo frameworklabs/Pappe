@@ -216,7 +216,7 @@ final class PappeTests: XCTestCase {
     }
     
     func testAbort() {
-        Module(imports: [common]) { name in
+        Module { name in
             activity (name.Test, [], [name.pos]) { val in
                 when { true } abort: {
                     exec { val.pos = 1 }
@@ -248,6 +248,58 @@ final class PappeTests: XCTestCase {
         }.test(steps: 10)
     }
     
+    func testAbortPrecedence() {
+        Module { name in
+            activity (name.Test, [name.outer, name.inner], [name.seenOuter, name.seenInner]) { val in
+                when { val.outer } abort: {
+                    when { val.inner } abort: {
+                        await { false }
+                    }
+                    exec { val.seenInner = true }
+                    await { false }
+                }
+                exec { val.seenOuter = true }
+                await { false }
+            }
+            activity (name.Main, []) { val in
+                exec {
+                    val.seenOuter = false
+                    val.seenInner = false
+                }
+                cobegin {
+                    strong {
+                        exec {
+                            val.outer = false
+                            val.inner = false
+                            val.expectedOuter = false
+                            val.expectedInner = false
+                        }
+                        await { true }
+                        exec {
+                            val.outer = true
+                            val.inner = true
+                            val.expectedOuter = true
+                            val.expectedInner = false
+                        }
+                        await { true }
+                    }
+                    weak {
+                        Pappe.run (name.Test, [val.outer, val.inner], [val.loc.seenOuter, val.loc.seenInner])
+                    }
+                    weak {
+                        `repeat` {
+                            exec {
+                                XCTAssertEqual(val.seenOuter as Bool, val.expectedOuter)
+                                XCTAssertEqual(val.seenInner as Bool, val.expectedInner)
+                            }
+                            await { true }
+                        }
+                    }
+                }
+            }
+        }.test(steps: 10)
+    }
+    
     func testLoc() {
         let m = Module { name in
             activity (name.Main, [name.in], [name.out]) { val in
@@ -271,6 +323,7 @@ final class PappeTests: XCTestCase {
         ("testCobegin", testCobegin),
         ("testRepeat", testRepeat),
         ("testAbort", testAbort),
+        ("testAbortPrecedence", testAbortPrecedence),
         ("testLoc", testLoc),
     ]
 }
