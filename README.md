@@ -16,7 +16,7 @@ In this usage example three trails run concurrently for 10 ticks as determined b
 let m = Module { name in
     activity (name.Wait, [name.ticks]) { val in
         exec { val.i = val.ticks as Int }
-        whileRepeat(val.i > 0) {
+        while { val.i > 0 } repeat: {
             exec { val.i -= 1 }
             await { true }
         }
@@ -24,18 +24,18 @@ let m = Module { name in
     activity (name.Main, []) { val in
         cobegin {
             strong {
-                doRun(name.Wait, [10])
+                run (name.Wait, [10])
             }
             weak {
-                loop {
-                    doRun(name.Wait, [2])
+                `repeat` {
+                    run (name.Wait, [2])
                     exec { print("on every third") }
                     await { true }
                 }
             }
             weak {
-                loop {
-                    doRun(name.Wait, [1])
+                `repeat` {
+                    run (name.Wait, [1])
                     exec { print("on every second") }
                     await { true }
                 }
