@@ -302,7 +302,62 @@ final class PappeTests: XCTestCase {
             }
         }.test(steps: 10)
     }
-    
+ 
+    func testDefer() {
+        var innerVal = false
+        Module { name in
+            activity (name.Inner, [], []) { val in
+                exec { innerVal = true }
+                `defer` { innerVal = false }
+                await { false }
+            }
+            activity (name.Test, [name.cond], [name.val]) { val in
+                when { val.cond } abort: {
+                    cobegin {
+                        strong {
+                            `defer` { val.val = false }
+                            exec { val.val = true }
+                            await { false }
+                        }
+                        strong {
+                            Pappe.run (name.Inner, [], [])
+                        }
+                    }
+                }
+                await { false }
+            }
+            activity (name.Main, []) { val in
+                exec {
+                    val.out = false
+                }
+                cobegin {
+                    strong {
+                        exec {
+                            val.cond = false
+                            val.expect = true
+                        }
+                        await { true }
+                        exec {
+                            val.cond = true
+                            val.expect = false
+                        }
+                        await { true }
+                    }
+                    weak {
+                        Pappe.run (name.Test, [val.cond], [val.loc.out])
+                    }
+                    weak {
+                        `repeat` {
+                            exec { XCTAssertEqual(val.out as Bool, val.expect) }
+                            exec { XCTAssertEqual(innerVal as Bool, val.expect) }
+                            await { true }
+                        }
+                    }
+                }
+            }
+        }.test(steps: 10)
+    }
+
     func testLoc() {
         let m = Module { name in
             activity (name.Main, [name.in], [name.out]) { val in

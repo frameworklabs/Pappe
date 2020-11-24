@@ -102,6 +102,7 @@ public enum Stmt {
     case whenAbort(Cond, [Stmt])
     case match([Conditional])
     case exec(Proc)
+    case `defer`(Proc)
     case exit(Func)
 }
 
@@ -214,6 +215,10 @@ public func `if`(_ cond: @escaping Cond, @StmtBuilder then builder: () -> [Stmt]
 
 public func exec(_ proc: @escaping Proc) -> Stmt {
     Stmt.exec(proc)
+}
+
+public func `defer`(_ proc: @escaping Proc) -> Stmt {
+    Stmt.`defer`(proc)
 }
 
 public func exit(_ f: @escaping Func) -> Stmt {
@@ -369,12 +374,18 @@ class BlockProcessor {
     let stmts: [Stmt]
     let procCtx: ProcessorCtx
     var pc: Int = 0
-    
     var subProc: Any?
+    var deferedProcs: [Proc] = []
     
     init(stmts: [Stmt], procCtx: ProcessorCtx) {
         self.stmts = stmts
         self.procCtx = procCtx
+    }
+    
+    deinit {
+        for proc in deferedProcs {
+            proc()
+        }
     }
     
     func reset() {
@@ -485,6 +496,10 @@ class BlockProcessor {
 
             case .exec(let p):
                 p()
+                pc.inc()
+                
+            case .defer(let p):
+                deferedProcs.append(p)
                 pc.inc()
                 
             case .exit(let f):
