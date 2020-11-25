@@ -100,7 +100,7 @@ public enum Stmt {
     case cobegin([Trail])
     case repeatUntil([Stmt], Cond)
     case whenAbort(Cond, [Stmt])
-    case match([Conditional])
+    case select([Match])
     case exec(Proc)
     case `defer`(Proc)
     case exit(Func)
@@ -111,7 +111,7 @@ public enum Trail {
     case weak([Stmt])
 }
 
-public typealias Conditional = (Cond, [Stmt])
+public typealias Match = (Cond, [Stmt])
 
 public struct Activity {
     let name: String
@@ -146,9 +146,9 @@ public struct TrailBuilder {
 }
 
 @_functionBuilder
-public struct ConditionalBuilder {
-    public static func buildBlock(_ conds: Conditional...) -> [Conditional] {
-        return conds
+public struct MatchBuilder {
+    public static func buildBlock(_ matches: Match...) -> [Match] {
+        return matches
     }
 }
 
@@ -201,16 +201,27 @@ public func when(_ cond: @escaping Cond, @StmtBuilder abort builder: () -> [Stmt
     Stmt.whenAbort(cond, builder())
 }
 
-public func match(@ConditionalBuilder _ builder: () -> [Conditional]) -> Stmt {
-    Stmt.match(builder())
+public func select(@MatchBuilder _ builder: () -> [Match]) -> Stmt {
+    Stmt.select(builder())
 }
 
-public func cond(_ cond: @escaping Cond, @StmtBuilder then builder: () -> [Stmt]) -> Conditional {
+public func match(_ cond: @escaping Cond, @StmtBuilder then builder: () -> [Stmt]) -> Match {
     (cond, builder())
 }
 
+public func otherwise(@StmtBuilder _ builder: () -> [Stmt]) -> Match {
+    ({ true }, builder())
+}
+
 public func `if`(_ cond: @escaping Cond, @StmtBuilder then builder: () -> [Stmt]) -> Stmt {
-    Stmt.match([(cond, builder())])
+    Stmt.select([(cond, builder())])
+}
+
+public func `if`(_ cond: @escaping Cond, @StmtBuilder then builder: () -> [Stmt], @StmtBuilder else altBuilder: () -> [Stmt]) -> Stmt {
+    Stmt.select([
+        (cond, builder()),
+        ({ true }, altBuilder())
+    ])
 }
 
 public func exec(_ proc: @escaping Proc) -> Stmt {
@@ -464,9 +475,9 @@ class BlockProcessor {
                 subProc = nil
                 pc.inc()
 
-            case let .match(conds):
+            case let .select(matches):
                 if subProc == nil {
-                    subProc = MatchProcessor(conds: conds, procCtx: procCtx)
+                    subProc = MatchProcessor(matches: matches, procCtx: procCtx)
                 }
                 let res = try (subProc as! MatchProcessor).tick()
                 if res == .wait {
@@ -669,8 +680,8 @@ class AbortProcessor {
 class MatchProcessor {
     let bp: BlockProcessor?
     
-    init(conds: [Conditional], procCtx: ProcessorCtx) {
-        for (cond, stmts) in conds {
+    init(matches: [Match], procCtx: ProcessorCtx) {
+        for (cond, stmts) in matches {
             if cond() {
                 bp = BlockProcessor(stmts: stmts, procCtx: procCtx)
                 return

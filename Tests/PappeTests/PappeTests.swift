@@ -357,6 +357,70 @@ final class PappeTests: XCTestCase {
             }
         }.test(steps: 10)
     }
+    
+    func testSelectAndIf() {
+        Module { name in
+            activity (name.Test1, [name.val], [name.pos]) { val in
+                `repeat` {
+                    select {
+                        match { val.val == 1 } then: {
+                            exec { val.pos = 1 }
+                        }
+                        match { val.val == 2 } then: {
+                            exec { val.pos = 2 }
+                        }
+                        otherwise {
+                            exec { val.pos = 3 }
+                        }
+                    }
+                    await { true }
+                }
+            }
+            activity (name.Test2, [name.val], [name.pos]) { val in
+                `repeat` {
+                    `if` { val.val == 1 } then: {
+                        exec { val.pos = 1 }
+                    } else: {
+                        `if` { val.val == 2 } then: {
+                            exec { val.pos = 2 }
+                        } else: {
+                            exec { val.pos = 3 }
+                        }
+                    }
+                    await { true }
+                }
+            }
+            activity (name.Main, []) { val in
+                exec {
+                    val.pos1 = 0
+                    val.pos2 = 0
+                }
+                cobegin {
+                    strong {
+                        exec { val.test = 1 }
+                        await { true }
+                        exec { val.test = 2 }
+                        await { true }
+                        exec { val.test = 3 }
+                        await { true }
+                    }
+                    weak {
+                        Pappe.run (name.Test1, [val.test], [val.loc.pos1])
+                    }
+                    weak {
+                        Pappe.run (name.Test2, [val.test], [val.loc.pos2])
+                    }
+                    weak {
+                        `repeat` {
+                            exec { XCTAssertEqual(val.pos1 as Int, val.test) }
+                            exec { XCTAssertEqual(val.pos2 as Int, val.test) }
+                            await { true }
+                        }
+                    }
+                }
+            }
+        }.test(steps: 10)
+    }
 
     func testLoc() {
         let m = Module { name in
@@ -382,6 +446,8 @@ final class PappeTests: XCTestCase {
         ("testRepeat", testRepeat),
         ("testAbort", testAbort),
         ("testAbortPrecedence", testAbortPrecedence),
+        ("testDefer", testDefer),
+        ("testSelectAndIf", testSelectAndIf),
         ("testLoc", testLoc),
     ]
 }
