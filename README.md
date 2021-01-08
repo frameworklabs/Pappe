@@ -46,7 +46,10 @@ let m = Module { name in
 }
 ```
 
-For more extensive code examples, please have a look at the [Unit Tests](https://github.com/frameworklabs/Pappe/blob/master/Tests/PappeTests/PappeTests.swift) or at the [BlinkerPappe Project](https://github.com/frameworklabs/BlinkerPappe). The Pappe code can be found in [this file](https://github.com/frameworklabs/BlinkerPappe/blob/master/BlinkerPappe/GameScene.swift).
+For more extensive code examples, please have a look at:
+* [Unit Tests](https://github.com/frameworklabs/Pappe/blob/master/Tests/PappeTests/PappeTests.swift)
+* [BlinkerPappe](https://github.com/frameworklabs/BlinkerPappe) project. The Pappe code can be found in [this file](https://github.com/frameworklabs/BlinkerPappe/blob/master/BlinkerPappe/GameScene.swift).
+* The [Synchrosphere](https://github.com/frameworklabs/Synchrosphere) project which allows to control Sphero robots via synchronous reactive code. 
 
 ## Caveats
 
