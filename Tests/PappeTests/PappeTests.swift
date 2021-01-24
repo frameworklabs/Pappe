@@ -78,7 +78,7 @@ final class PappeTests: XCTestCase {
     func testExit() {
         Module { name in
             activity (name.Inner, []) { val in
-                exit { 42 }
+                `return` { 42 }
                 await { false }
             }
             activity (name.Test, []) { val in
@@ -86,7 +86,7 @@ final class PappeTests: XCTestCase {
                     `repeat` {
                         await { true }
                         Pappe.run  (name.Inner, []) { res in val.tmp = res }
-                        exit { val.tmp }
+                        `return` { val.tmp }
                         await { false }
                     }
                 }

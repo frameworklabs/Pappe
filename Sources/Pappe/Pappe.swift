@@ -26,7 +26,7 @@ struct CtxLoc : Loc {
     
     var val: Any {
         get {
-            return ctx[dynamicMember: name]
+            ctx[dynamicMember: name]
         }
         set {
             ctx[dynamicMember: name] = newValue
@@ -39,7 +39,7 @@ public struct Locs {
     let ctx: Ctx
     
     public subscript(dynamicMember name: String) -> Loc {
-        return CtxLoc(name: name, ctx: ctx)
+        CtxLoc(name: name, ctx: ctx)
     }
 }
 
@@ -80,7 +80,7 @@ public class Ctx {
 @dynamicMemberLookup
 public struct ID {
     public subscript(dynamicMember name: String) -> String {
-        return name
+        name
     }
 }
 
@@ -134,28 +134,28 @@ public struct Activity {
 @_functionBuilder
 public struct StmtBuilder {
     public static func buildBlock(_ stmts: Stmt...) -> [Stmt] {
-        return stmts
+        stmts
     }
 }
 
 @_functionBuilder
 public struct TrailBuilder {
     public static func buildBlock(_ trails: Trail...) -> [Trail] {
-        return trails
+        trails
     }
 }
 
 @_functionBuilder
 public struct MatchBuilder {
     public static func buildBlock(_ matches: Match...) -> [Match] {
-        return matches
+        matches
     }
 }
 
 @_functionBuilder
 public struct ActivityBuilder {
     public static func buildBlock(_ acts: Activity...) -> [Activity] {
-        return acts
+        acts
     }
 }
 
@@ -184,17 +184,15 @@ public func weak(@StmtBuilder _ builder: () -> [Stmt]) -> Trail {
 }
 
 public func `while`(_ cond: @escaping Cond, @StmtBuilder repeat builder: () -> [Stmt]) -> Stmt {
-    `if` { cond() } then: {
-        `repeat`(builder, until: {!cond()})
-    }
+    Stmt.select([(cond, [Stmt.repeatUntil(builder(), { !cond() })])])
 }
 
 public func `repeat`(@StmtBuilder _ builder: () -> [Stmt]) -> Stmt {
-    return Stmt.repeatUntil(builder(), { false })
+    Stmt.repeatUntil(builder(), { false })
 }
 
 public func `repeat`(@StmtBuilder _ builder: () -> [Stmt], until cond: @escaping Cond) -> Stmt {
-    return Stmt.repeatUntil(builder(), cond)
+    Stmt.repeatUntil(builder(), cond)
 }
 
 public func when(_ cond: @escaping Cond, @StmtBuilder abort builder: () -> [Stmt]) -> Stmt {
@@ -232,13 +230,13 @@ public func `defer`(_ proc: @escaping Proc) -> Stmt {
     Stmt.`defer`(proc)
 }
 
-public func exit(_ f: @escaping Func) -> Stmt {
+public func `return`(_ f: @escaping Func) -> Stmt {
     Stmt.exit(f)
 }
 
 public func activity(_ name: String, _ inParams: [String], _ outParams: [String] = [], @StmtBuilder _ builder: @escaping (Ctx) -> [Stmt]) -> Activity
 {
-    return Activity(name: name, inParams: inParams, outParams: outParams, builder: builder)
+    Activity(name: name, inParams: inParams, outParams: outParams, builder: builder)
 }
 
 @available(swift 5.3)
@@ -319,12 +317,12 @@ public class Processor {
     
     @discardableResult
     public func tick(_ inArgs: [Any], _ outArgs: [Loc]) throws -> TickResult {
-        return try ap.tick(inArgs, outArgs)
+        try ap.tick(inArgs, outArgs)
     }
     
     var receiveCtx: ReceiveCtx? {
         get {
-            return procCtx.receiveCtx
+            procCtx.receiveCtx
         }
         set {
             procCtx.receiveCtx = newValue
