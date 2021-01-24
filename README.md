@@ -51,6 +51,8 @@ For more extensive code examples, please have a look at:
 * [BlinkerPappe](https://github.com/frameworklabs/BlinkerPappe) project. The Pappe code can be found in [this file](https://github.com/frameworklabs/BlinkerPappe/blob/master/BlinkerPappe/GameScene.swift).
 * The [Synchrosphere](https://github.com/frameworklabs/Synchrosphere) project as well as the [SynchrosphereDemo](https://github.com/frameworklabs/SynchrosphereDemo) App which allows to control Sphero robots via synchronous reactive code. 
 
+The documentation of the SynchrosphereDemos can be seen as a [tutorial](https://github.com/frameworklabs/SynchrosphereDemo/blob/main/README.md#io-demos) for the Pappe language as it explains many language constructs with concrete examples.
+
 ## Caveats
 
 The Pappe DSL is more of a proof of concept. It has many shortcommings like:
