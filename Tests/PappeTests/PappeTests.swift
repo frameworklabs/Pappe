@@ -75,7 +75,7 @@ final class PappeTests: XCTestCase {
         }.test(steps: 10)
     }
 
-    func testExit() {
+    func testReturn() {
         Module { name in
             activity (name.Inner, []) { val in
                 `return` { 42 }
@@ -534,11 +534,12 @@ final class PappeTests: XCTestCase {
     
     static var allTests = [
         ("testAwait", testAwait),
-        ("testExit", testExit),
+        ("testReturn", testReturn),
         ("testCobegin", testCobegin),
         ("testRepeat", testRepeat),
         ("testAbort", testAbort),
         ("testAbortPrecedence", testAbortPrecedence),
+        ("testReset", testReset),
         ("testDefer", testDefer),
         ("testSelectAndIf", testSelectAndIf),
         ("testLoc", testLoc),

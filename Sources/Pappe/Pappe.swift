@@ -6,7 +6,7 @@ import Dispatch
 public enum Errors : Error {
     case varNotFound(String)
     case activityNotFound(String)
-    case exitNotAllowed
+    case returnNotAllowed
 }
 
 public protocol Loc {
@@ -45,33 +45,18 @@ public struct Locs {
 
 @dynamicMemberLookup
 public class Ctx {
-    let parent: Ctx?
-    var map: [String: Any] = [:]
+    private var map: [String: Any] = [:]
     
     public lazy var loc: Locs = Locs(ctx: self)
-    
-    init(_ parent: Ctx? = nil) {
-        self.parent = parent
-    }
-    
+        
     public subscript<T>(dynamicMember name: String) -> T {
         get {
             if let val = map[name] {
                 return val as! T
             }
-            if let p = parent {
-                return p[dynamicMember: name]
-            }
             fatalError("\(name) is not a variable!")
         }
         set {
-            if let _ = map[name] {
-                map[name] = newValue
-                return
-            }
-            if let p = parent {
-                p[dynamicMember: name] = newValue
-            }
             map[name] = newValue
         }
     }
@@ -115,9 +100,9 @@ public typealias Match = (Cond, [Stmt])
 
 public struct Activity {
     let name: String
-    let inParams: [String]
-    let outParams: [String]
-    let builder: (Ctx) -> [Stmt]
+    private let inParams: [String]
+    private let outParams: [String]
+    private let builder: (Ctx) -> [Stmt]
     
     init(name: String, inParams: [String], outParams: [String], @StmtBuilder builder: @escaping (Ctx) -> [Stmt]) {
         self.name = name
@@ -250,8 +235,8 @@ public func activity(_ name: String, _ inParams: [String], _ outParams: [String]
 public class Module {
     public typealias Import = Module
     
-    let activities: [Activity]
-    let imports: [Import]
+    private let activities: [Activity]
+    private let imports: [Import]
     
     public init(imports: [Import] = [], @ActivityBuilder builder: (ID) -> [Activity]) {
         activities = builder(ID())
@@ -311,8 +296,8 @@ class ProcessorCtx {
 }
 
 public class Processor {
-    let procCtx: ProcessorCtx
-    let ap: ActivityProcessor
+    private let procCtx: ProcessorCtx
+    private let ap: ActivityProcessor
 
     public init(module: Module, entryPoint: String = "Main") throws {
         guard let a = module[entryPoint] else {
@@ -362,9 +347,9 @@ extension Activity {
 }
 
 class ActivityProcessor {
-    let act: Activity
-    let bp: BlockProcessor
-    let ctx = Ctx()
+    private let act: Activity
+    private let bp: BlockProcessor
+    private let ctx = Ctx()
     
     init(act: Activity, procCtx: ProcessorCtx) {
         self.act = act
@@ -387,11 +372,11 @@ extension Int {
 }
 
 class BlockProcessor {
-    let stmts: [Stmt]
-    let procCtx: ProcessorCtx
-    var pc: Int = 0
-    var subProc: Any?
-    var deferedProcs: [Proc] = []
+    private let stmts: [Stmt]
+    private let procCtx: ProcessorCtx
+    private var pc: Int = 0
+    private var subProc: Any?
+    private var deferedProcs: [Proc] = []
     
     init(stmts: [Stmt], procCtx: ProcessorCtx) {
         self.stmts = stmts
@@ -527,8 +512,8 @@ class BlockProcessor {
 }
 
 class AwaitProcessor {
-    let c: Cond
-    var hitAwait = true
+    private let c: Cond
+    private var hitAwait = true
     
     init(cond: @escaping Cond) {
         c = cond
@@ -544,11 +529,11 @@ class AwaitProcessor {
 }
 
 class ReceiveProcessor : Receiver {    
-    var outLoc: Loc
-    let resetValue: Any?
-    let procCtx: ProcessorCtx
-    var val: Any?
-    var res: TickResult = .wait
+    private var outLoc: Loc
+    private let resetValue: Any?
+    private let procCtx: ProcessorCtx
+    private var val: Any?
+    private var res: TickResult = .wait
     var box: Any?
 
     init(outLoc: Loc, resetValue: Any?, pFunc: PFunc, procCtx: ProcessorCtx) {
@@ -590,7 +575,7 @@ class ReceiveProcessor : Receiver {
 }
 
 class CobeginProcessor {
-    let tps: [TrailProcessor]
+    private let tps: [TrailProcessor]
     
     init(trails: [Trail], procCtx: ProcessorCtx) {
         tps = trails.map { trail in
@@ -618,7 +603,7 @@ class CobeginProcessor {
                 }
             }
             else if res != .wait {
-                throw Errors.exitNotAllowed
+                throw Errors.returnNotAllowed
             }
             if tp.strong {
                 numStrong += 1
@@ -638,8 +623,8 @@ class TrailProcessor : BlockProcessor {
 }
 
 class WhileProcessor {
-    let c: Cond
-    let bp: BlockProcessor
+    private let c: Cond
+    private let bp: BlockProcessor
     
     init(cond: @escaping Cond, stmts: [Stmt], procCtx: ProcessorCtx) {
         c = cond
@@ -661,9 +646,9 @@ class WhileProcessor {
 }
 
 class AbortProcessor {
-    let c: Cond
-    let bp: BlockProcessor
-    var check = false
+    private let c: Cond
+    private let bp: BlockProcessor
+    private var check = false
     
     init(cond: @escaping Cond, stmts: [Stmt], procCtx: ProcessorCtx) {
         c = cond
@@ -683,7 +668,7 @@ class AbortProcessor {
 }
 
 class MatchProcessor {
-    let bp: BlockProcessor?
+    private let bp: BlockProcessor?
     
     init(matches: [Match], procCtx: ProcessorCtx) {
         for (cond, stmts) in matches {
