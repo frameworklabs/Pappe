@@ -302,6 +302,99 @@ final class PappeTests: XCTestCase {
             }
         }.test(steps: 10)
     }
+    
+    func testReset() {
+        Module { name in
+            activity (name.Main, []) { val in
+                cobegin {
+                    strong {
+                        exec {
+                            val.cond = false
+                            val.step = 0
+                            val.expectedStep = 1
+                        }
+                        await { true }
+                        exec { val.expectedStep = 2 }
+                        await { true }
+                        exec { val.expectedStep = 3 }
+                        await { true }
+                        
+                        exec { val.expectedStep = 1 }
+                        await { true }
+                        exec {
+                            val.cond = true
+                            val.expectedStep = 2
+                        }
+                        await { true }
+                        exec {
+                            val.cond = false
+                            val.expectedStep = 12
+                        }
+                        await { true }
+                        exec { val.expectedStep = 112 }
+                        await { true }
+                        
+                        exec { val.expectedStep = 1 }
+                        await { true }
+                        exec {
+                            val.innerCond = true
+                            val.expectedStep = 2
+                        }
+                        await { true }
+                        exec {
+                            val.innerCond = false
+                            val.expectedStep = 12
+                        }
+                        await { true }
+                        exec { val.expectedStep = 112 }
+                        await { true }
+                        exec { val.expectedStep = 1112 }
+                        await { true }
+                    }
+                    weak {
+                        when { val.cond } reset: {
+                            exec { val.step = 1 }
+                            await { true }
+                            exec { val.step = 2}
+                            await { true }
+                        }
+                        exec { val.step = 3 }
+                        await { true }
+                        
+                        exec { val.step = 0 }
+                        when { val.cond } reset: {
+                            exec { val.step = val.step + 1 }
+                            await { true }
+                            exec { val.step = val.step + 10 }
+                            await { true }
+                        }
+                        exec { val.step = val.step + 100 }
+                        await { true }
+                        
+                        exec { val.step = 0 }
+                        when { val.cond } reset: {
+                            when { val.innerCond } reset: {
+                                exec { val.step = val.step + 1 }
+                                await { true }
+                                exec { val.step = val.step + 10 }
+                                await { true }
+                            }
+                            exec { val.step = val.step + 100 }
+                            await { true }
+                        }
+                        exec { val.step = val.step + 1000 }
+                        await { true }
+                    }
+                    weak {
+                        `repeat` {
+                            exec { XCTAssertEqual(val.step as Int, val.expectedStep) }
+                            await { true }
+                        }
+                    }
+                }
+            }
+        }.test(steps: 20)
+    }
  
     func testDefer() {
         var innerVal = false

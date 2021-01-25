@@ -199,6 +199,13 @@ public func when(_ cond: @escaping Cond, @StmtBuilder abort builder: () -> [Stmt
     Stmt.whenAbort(cond, builder())
 }
 
+public func when(_ cond: @escaping Cond, @StmtBuilder reset builder: () -> [Stmt]) -> Stmt {
+    var done = false
+    return `repeat` {
+        Stmt.whenAbort(cond, builder() + [exec { done = true }])
+    } until: { done }
+}
+
 public func select(@MatchBuilder _ builder: () -> [Match]) -> Stmt {
     Stmt.select(builder())
 }
