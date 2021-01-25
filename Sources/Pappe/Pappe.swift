@@ -226,6 +226,14 @@ public func `return`(_ f: @escaping Func) -> Stmt {
     Stmt.exit(f)
 }
 
+public func every(_ cond: @escaping Cond, @StmtBuilder do builder: () -> [Stmt]) -> Stmt {
+    Stmt.repeatUntil([Stmt.await(cond)] + builder(), { false })
+}
+
+public func nowAndEvery(_ cond: @escaping Cond, @StmtBuilder do builder: () -> [Stmt]) -> Stmt {
+    Stmt.repeatUntil(builder() + [Stmt.await(cond)], { false })
+}
+
 public func activity(_ name: String, _ inParams: [String], _ outParams: [String] = [], @StmtBuilder _ builder: @escaping (Ctx) -> [Stmt]) -> Activity
 {
     Activity(name: name, inParams: inParams, outParams: outParams, builder: builder)
