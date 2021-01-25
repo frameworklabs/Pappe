@@ -78,6 +78,9 @@ public typealias MLFunc = () -> [Loc]
 public typealias Cond = () -> Bool
 public typealias ResFunc = (Any?) -> Void
 
+let trueCond: Cond = { true }
+let falseCond: Cond = { false }
+
 public enum Stmt {
     case await(Cond)
     case receive(LFunc, Any?, PFunc)
@@ -173,7 +176,7 @@ public func `while`(_ cond: @escaping Cond, @StmtBuilder repeat builder: () -> [
 }
 
 public func `repeat`(@StmtBuilder _ builder: () -> [Stmt]) -> Stmt {
-    Stmt.repeatUntil(builder(), { false })
+    Stmt.repeatUntil(builder(), falseCond)
 }
 
 public func `repeat`(@StmtBuilder _ builder: () -> [Stmt], until cond: @escaping Cond) -> Stmt {
@@ -200,7 +203,7 @@ public func match(_ cond: @escaping Cond, @StmtBuilder then builder: () -> [Stmt
 }
 
 public func otherwise(@StmtBuilder _ builder: () -> [Stmt]) -> Match {
-    ({ true }, builder())
+    (trueCond, builder())
 }
 
 public func `if`(_ cond: @escaping Cond, @StmtBuilder then builder: () -> [Stmt]) -> Stmt {
@@ -210,7 +213,7 @@ public func `if`(_ cond: @escaping Cond, @StmtBuilder then builder: () -> [Stmt]
 public func `if`(_ cond: @escaping Cond, @StmtBuilder then builder: () -> [Stmt], @StmtBuilder else altBuilder: () -> [Stmt]) -> Stmt {
     Stmt.select([
         (cond, builder()),
-        ({ true }, altBuilder())
+        (trueCond, altBuilder())
     ])
 }
 
@@ -227,11 +230,11 @@ public func `return`(_ f: @escaping Func) -> Stmt {
 }
 
 public func every(_ cond: @escaping Cond, @StmtBuilder do builder: () -> [Stmt]) -> Stmt {
-    Stmt.repeatUntil([Stmt.await(cond)] + builder(), { false })
+    Stmt.repeatUntil([Stmt.await(cond)] + builder(), falseCond)
 }
 
 public func nowAndEvery(_ cond: @escaping Cond, @StmtBuilder do builder: () -> [Stmt]) -> Stmt {
-    Stmt.repeatUntil(builder() + [Stmt.await(cond)], { false })
+    Stmt.repeatUntil(builder() + [Stmt.await(cond)], falseCond)
 }
 
 public func activity(_ name: String, _ inParams: [String], _ outParams: [String] = [], @StmtBuilder _ builder: @escaping (Ctx) -> [Stmt]) -> Activity
