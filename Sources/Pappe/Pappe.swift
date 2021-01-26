@@ -3,16 +3,21 @@
 
 import Dispatch
 
+/// A list of possible runtime errors.
 public enum Errors : Error {
     case varNotFound(String)
     case activityNotFound(String)
     case returnNotAllowed
 }
 
+/// Protocol for the location of a variable.
 public protocol Loc {
+    
+    /// Get and set the value of the variable at this location.
     var val: Any { get set }
 }
 
+/// Concrete location which directl stores the value.
 public class DirectLoc : Loc {
     public var val: Any
     public init(val: Any) {
@@ -34,21 +39,26 @@ struct CtxLoc : Loc {
     }
 }
 
+/// Creates a location for a given variable name.
 @dynamicMemberLookup
 public struct Locs {
     let ctx: Ctx
     
+    /// Creates the location from a variable name given by member lookup.
     public subscript(dynamicMember name: String) -> Loc {
         CtxLoc(name: name, ctx: ctx)
     }
 }
 
+/// Stores local variables like in Python.
 @dynamicMemberLookup
 public class Ctx {
     private var map: [String: Any] = [:]
     
+    /// Access to the location factory.
     public lazy var loc: Locs = Locs(ctx: self)
         
+    /// Get and set a variable by member lookup.
     public subscript<T>(dynamicMember name: String) -> T {
         get {
             if let val = map[name] {
@@ -62,8 +72,11 @@ public class Ctx {
     }
 }
 
+/// Converts a member-lookup into a string.
 @dynamicMemberLookup
 public struct ID {
+    
+    /// Returns the string for the given member lookup.
     public subscript(dynamicMember name: String) -> String {
         name
     }
@@ -147,46 +160,57 @@ public struct ActivityBuilder {
     }
 }
 
+/// Waits for the next step. At the beginning of the next step `cond` is checked and if `true` control progresses else it waits for the next step.
 public func await(_ cond: @escaping Cond) -> Stmt {
     Stmt.await(cond)
 }
 
+/// 'Unofficial' statement to wait until an asynchronous function calls back on the `Receiver` passed to the closure.
 public func receive(_ outArg: @autoclosure @escaping LFunc, resetTo value: Any? = nil, _ pfun: @escaping PFunc) -> Stmt {
     Stmt.receive(outArg, value, pfun)
 }
 
+/// Runs the activity with the given `name` passing `inArgs` and `outArgs` to/from it in every step. When the activity ends, a result might be passed in the final closure.
 public func run(_ name: String, _ inArgs: @autoclosure @escaping MFunc, _ outArgs: @autoclosure @escaping MLFunc = [], _ res: ResFunc? = nil) -> Stmt {
     Stmt.run(name, inArgs, outArgs, res)
 }
 
+/// Begins scope of concurrent trails.
 public func cobegin(@TrailBuilder _ builder: () -> [Trail]) -> Stmt {
     Stmt.cobegin(builder())
 }
 
+/// A trail which will determine the life-cycle of a `cobegin` statement.
 public func strong(@StmtBuilder _ builder: () -> [Stmt]) -> Trail {
     Trail.strong(builder())
 }
 
+/// A trail which can be preempted at the end of a step if all strong trails have finished.
 public func weak(@StmtBuilder _ builder: () -> [Stmt]) -> Trail {
     Trail.weak(builder())
 }
 
+/// Checks `cond` at the beginning of each  loop and enters it if `true`.
 public func `while`(_ cond: @escaping Cond, @StmtBuilder repeat builder: () -> [Stmt]) -> Stmt {
     Stmt.select([(cond, [Stmt.repeatUntil(builder(), { !cond() })])])
 }
 
+/// Unconditionally repeats the statements in the body.
 public func `repeat`(@StmtBuilder _ builder: () -> [Stmt]) -> Stmt {
     Stmt.repeatUntil(builder(), falseCond)
 }
 
+/// Checks `cond` at the and of each loop and stops looping once it becomes `true`.
 public func `repeat`(@StmtBuilder _ builder: () -> [Stmt], until cond: @escaping Cond) -> Stmt {
     Stmt.repeatUntil(builder(), cond)
 }
 
+/// Checks `cond` on every step and aborts given body if `true`.
 public func when(_ cond: @escaping Cond, @StmtBuilder abort builder: () -> [Stmt]) -> Stmt {
     Stmt.whenAbort(cond, builder())
 }
 
+/// Checks `cond` on every step and restarts given body if `true`.
 public func when(_ cond: @escaping Cond, @StmtBuilder reset builder: () -> [Stmt]) -> Stmt {
     var done = false
     return `repeat` {
@@ -194,22 +218,27 @@ public func when(_ cond: @escaping Cond, @StmtBuilder reset builder: () -> [Stmt
     } until: { done }
 }
 
+/// Runs the statements of the first match with a `true` condition.
 public func select(@MatchBuilder _ builder: () -> [Match]) -> Stmt {
     Stmt.select(builder())
 }
 
+/// Statements guarded by the condition `cond`.
 public func match(_ cond: @escaping Cond, @StmtBuilder then builder: () -> [Stmt]) -> Match {
     (cond, builder())
 }
 
+/// Statements which are always able to run.
 public func otherwise(@StmtBuilder _ builder: () -> [Stmt]) -> Match {
     (trueCond, builder())
 }
 
+/// Runs statements conditionally.
 public func `if`(_ cond: @escaping Cond, @StmtBuilder then builder: () -> [Stmt]) -> Stmt {
     Stmt.select([(cond, builder())])
 }
 
+/// Runs statements conditionally with an alternative if `cond` evaluates to `false`.
 public func `if`(_ cond: @escaping Cond, @StmtBuilder then builder: () -> [Stmt], @StmtBuilder else altBuilder: () -> [Stmt]) -> Stmt {
     Stmt.select([
         (cond, builder()),
@@ -217,31 +246,38 @@ public func `if`(_ cond: @escaping Cond, @StmtBuilder then builder: () -> [Stmt]
     ])
 }
 
+/// Executes arbitrary one-step code.
 public func exec(_ proc: @escaping Proc) -> Stmt {
     Stmt.exec(proc)
 }
 
+/// One-step code which runs when the scope is left. Contrary to local variables, the scope is given by compund statements.
 public func `defer`(_ proc: @escaping Proc) -> Stmt {
     Stmt.`defer`(proc)
 }
 
+/// Returns a value from an activity.
 public func `return`(_ f: @escaping Func) -> Stmt {
     Stmt.exit(f)
 }
 
+/// 'Unofficial' statement which repeatedly waits for `cond` to be true and then executes given statements.
 public func every(_ cond: @escaping Cond, @StmtBuilder do builder: () -> [Stmt]) -> Stmt {
     Stmt.repeatUntil([Stmt.await(cond)] + builder(), falseCond)
 }
 
+/// 'Unofficial' statement which repeatedly executes given statements and then waits for `cond` to be true.
 public func nowAndEvery(_ cond: @escaping Cond, @StmtBuilder do builder: () -> [Stmt]) -> Stmt {
     Stmt.repeatUntil(builder() + [Stmt.await(cond)], falseCond)
 }
 
+/// Definition of a new activity with name, input and in-out parameters.
 public func activity(_ name: String, _ inParams: [String], _ outParams: [String] = [], @StmtBuilder _ builder: @escaping (Ctx) -> [Stmt]) -> Activity
 {
     Activity(name: name, inParams: inParams, outParams: outParams, builder: builder)
 }
 
+/// A collection of activities.
 @available(swift 5.3)
 public class Module {
     public typealias Import = Module
@@ -249,6 +285,7 @@ public class Module {
     private let activities: [Activity]
     private let imports: [Import]
     
+    /// Creates a module.
     public init(imports: [Import] = [], @ActivityBuilder builder: (ID) -> [Activity]) {
         activities = builder(ID())
         self.imports = imports
@@ -267,6 +304,7 @@ public class Module {
     }
 }
 
+/// The result of a tick().
 public enum TickResult {
     case wait
     case done
@@ -284,6 +322,7 @@ extension TickResult : Equatable {
     }
 }
 
+/// Callback interface called by asynchronous functions once they are ready.
 public protocol Receiver : class {
     var box: Any? { get set }
 
@@ -292,9 +331,10 @@ public protocol Receiver : class {
     func react()
 }
 
+/// Provides information what to do when an async function calls back on `Receive`.
 public struct ReceiveCtx {
-    let queue: DispatchQueue
-    let trigger: Proc
+    public let queue: DispatchQueue
+    public let trigger: Proc
 }
 
 class ProcessorCtx {
@@ -306,10 +346,12 @@ class ProcessorCtx {
     }
 }
 
+/// Runs activities step by step.
 public class Processor {
     private let procCtx: ProcessorCtx
     private let ap: ActivityProcessor
 
+    /// Creates a processor with given `module` and `entryPoint`.
     public init(module: Module, entryPoint: String = "Main") throws {
         guard let a = module[entryPoint] else {
             throw Errors.activityNotFound(entryPoint)
@@ -318,12 +360,14 @@ public class Processor {
         ap = ActivityProcessor(act: a, procCtx: procCtx)
     }
     
+    /// Runs a single step with given input and in-out arguments.
     @discardableResult
     public func tick(_ inArgs: [Any], _ outArgs: [Loc]) throws -> TickResult {
         try ap.tick(inArgs, outArgs)
     }
     
-    var receiveCtx: ReceiveCtx? {
+    /// Allows to get and set the `ReceiverCtx`.
+    public var receiveCtx: ReceiveCtx? {
         get {
             procCtx.receiveCtx
         }
@@ -334,6 +378,8 @@ public class Processor {
 }
 
 extension Module {
+    
+    /// Helper to get a processor from a `Module`.
     public func makeProcessor(entryPoint: String = "Main") -> Processor? {
         try? Processor(module: self, entryPoint: entryPoint)
     }
