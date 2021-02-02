@@ -349,7 +349,7 @@ class ProcessorCtx {
 /// Runs activities step by step.
 public class Processor {
     private let procCtx: ProcessorCtx
-    private let ap: ActivityProcessor
+    private var ap: ActivityProcessor?
 
     /// Creates a processor with given `module` and `entryPoint`.
     public init(module: Module, entryPoint: String = "Main") throws {
@@ -363,7 +363,12 @@ public class Processor {
     /// Runs a single step with given input and in-out arguments.
     @discardableResult
     public func tick(_ inArgs: [Any], _ outArgs: [Loc]) throws -> TickResult {
-        try ap.tick(inArgs, outArgs)
+        guard let ap = ap else { return .done }
+        let res = try ap.tick(inArgs, outArgs)
+        if res != .wait {
+            self.ap = nil
+        }
+        return res
     }
     
     /// Allows to get and set the `ReceiverCtx`.

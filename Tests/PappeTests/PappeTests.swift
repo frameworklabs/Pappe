@@ -451,6 +451,23 @@ final class PappeTests: XCTestCase {
         }.test(steps: 10)
     }
     
+    func testDeferInMain() {
+        var didCallDefer = false
+        let m = Module { name in
+            activity (name.Main, []) { val in
+                `defer` { didCallDefer = true }
+                await { true }
+            }
+        }
+        let p = try! Processor(module: m)
+        var done = false
+        while !done {
+            done = try! p.tick([], []) != .wait
+        }
+
+        XCTAssertTrue(didCallDefer)
+    }
+    
     func testSelectAndIf() {
         Module { name in
             activity (name.Test1, [name.val], [name.pos]) { val in
