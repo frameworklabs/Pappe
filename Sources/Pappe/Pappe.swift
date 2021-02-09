@@ -263,17 +263,17 @@ public func `return`(_ f: @escaping Func) -> Stmt {
     Stmt.exit(f)
 }
 
-/// 'Unofficial' statement which repeatedly waits for `cond` to be true and then executes given statements.
+/// 'Unofficial' statement which waits for `cond` to be true before executing given one-step code; then it repeats.
 public func every(_ cond: @escaping Cond, do proc: @escaping Proc) -> Stmt {
     Stmt.repeatUntil([Stmt.await(cond), Stmt.exec(proc)], falseCond)
 }
 
-/// 'Unofficial' statement which repeatedly executes given statements and then waits for `cond` to be true.
+/// 'Unofficial' statement which executes given one-step code before it waits for `cond` to be true; then it repeats.
 public func nowAndEvery(_ cond: @escaping Cond, do proc: @escaping Proc) -> Stmt {
     Stmt.repeatUntil([Stmt.exec(proc), Stmt.await(cond)], falseCond)
 }
 
-/// 'Unofficial'' statement which executes given statements now and every following step.
+/// 'Unofficial'' statement which executes given one-step code now and every following step.
 public func always(_ proc: @escaping Proc) -> Stmt {
     Stmt.repeatUntil([Stmt.exec(proc), Stmt.await(trueCond)], falseCond)
 }
