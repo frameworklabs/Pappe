@@ -6,7 +6,7 @@ An embedded interpreted synchronous DSL for Swift.
 
 This Swift Package allows you to experiment with synchronous programming in Swift. It follows the imperative synchronous programming language [Blech](https://blech-lang.org) and tries to recreate parts of it as an embedded interpreted DSL using the Swift `functionBuilders`.
 
-The imperative synchronous approach gives you control over the (logical) timing aspects of your program turning them from non-functional to functional qualities.
+The imperative synchronous approach allows preemption and concurrency in a structured and modular way.
 
 ## Usage
 
@@ -49,9 +49,9 @@ let m = Module { name in
 For more extensive code examples, please have a look at:
 * [Unit Tests](https://github.com/frameworklabs/Pappe/blob/master/Tests/PappeTests/PappeTests.swift)
 * [BlinkerPappe](https://github.com/frameworklabs/BlinkerPappe) project. The Pappe code can be found in [this file](https://github.com/frameworklabs/BlinkerPappe/blob/master/BlinkerPappe/GameScene.swift).
-* The [Synchrosphere](https://github.com/frameworklabs/Synchrosphere) project as well as the [SynchrosphereDemo](https://github.com/frameworklabs/SynchrosphereDemo) App which allows to control Sphero robots via synchronous reactive code. 
+* The [Synchrosphere](https://github.com/frameworklabs/Synchrosphere) project as well as the [SynchrosphereDemo](https://github.com/frameworklabs/SynchrosphereDemo) App which allows to control Sphero robots via imperative synchronous code. 
 
-The documentation of the SynchrosphereDemos can be seen as a [tutorial](https://github.com/frameworklabs/SynchrosphereDemo/blob/main/README.md#io-demos) for the Pappe language as it explains many language constructs with concrete examples.
+The documentation of the SynchrosphereDemos can be seen as a [tutorial](https://github.com/frameworklabs/SynchrosphereDemo/blob/main/README.md#io-demos) for the Pappe language, as it explains its language constructs with concrete examples.
 
 ## Caveats
 

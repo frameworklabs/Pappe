@@ -1,5 +1,5 @@
 // Project Pappe
-// Copyright 2020, Framework Labs.
+// Copyright 2020-2021, Framework Labs.
 
 import Dispatch
 
@@ -17,7 +17,7 @@ public protocol Loc {
     var val: Any { get set }
 }
 
-/// Concrete location which directl stores the value.
+/// Concrete location which directly stores the value.
 public class DirectLoc : Loc {
     public var val: Any
     public init(val: Any) {
@@ -205,12 +205,12 @@ public func `repeat`(@StmtBuilder _ builder: () -> [Stmt], until cond: @escaping
     Stmt.repeatUntil(builder(), cond)
 }
 
-/// Checks `cond` on every step and aborts given body if `true`.
+/// Checks `cond` on every step and aborts the body if `true`.
 public func when(_ cond: @escaping Cond, @StmtBuilder abort builder: () -> [Stmt]) -> Stmt {
     Stmt.whenAbort(cond, builder())
 }
 
-/// Checks `cond` on every step and restarts given body if `true`.
+/// Checks `cond` on every step and restarts the body if `true`.
 public func when(_ cond: @escaping Cond, @StmtBuilder reset builder: () -> [Stmt]) -> Stmt {
     var done = false
     return `repeat` {
@@ -251,24 +251,31 @@ public func exec(_ proc: @escaping Proc) -> Stmt {
     Stmt.exec(proc)
 }
 
-/// One-step code which runs when the scope is left. Contrary to local variables, the scope is given by compund statements.
+/// One-step code which runs when the scope is left.
+///
+/// Contrary to local variables, which have the activity as scope (like in Python), the scope of a `defer` corresponds to statement blocks like the body of a `repeat`.
 public func `defer`(_ proc: @escaping Proc) -> Stmt {
     Stmt.`defer`(proc)
 }
 
-/// Returns a value from an activity.
+/// Returns from an activity by returing the result of the given function.
 public func `return`(_ f: @escaping Func) -> Stmt {
     Stmt.exit(f)
 }
 
 /// 'Unofficial' statement which repeatedly waits for `cond` to be true and then executes given statements.
-public func every(_ cond: @escaping Cond, @StmtBuilder do builder: () -> [Stmt]) -> Stmt {
-    Stmt.repeatUntil([Stmt.await(cond)] + builder(), falseCond)
+public func every(_ cond: @escaping Cond, do proc: @escaping Proc) -> Stmt {
+    Stmt.repeatUntil([Stmt.await(cond), Stmt.exec(proc)], falseCond)
 }
 
 /// 'Unofficial' statement which repeatedly executes given statements and then waits for `cond` to be true.
-public func nowAndEvery(_ cond: @escaping Cond, @StmtBuilder do builder: () -> [Stmt]) -> Stmt {
-    Stmt.repeatUntil(builder() + [Stmt.await(cond)], falseCond)
+public func nowAndEvery(_ cond: @escaping Cond, do proc: @escaping Proc) -> Stmt {
+    Stmt.repeatUntil([Stmt.exec(proc), Stmt.await(cond)], falseCond)
+}
+
+/// 'Unofficial'' statement which executes given statements now and every following step.
+public func always(_ proc: @escaping Proc) -> Stmt {
+    Stmt.repeatUntil([Stmt.exec(proc), Stmt.await(trueCond)], falseCond)
 }
 
 /// Definition of a new activity with name, input and in-out parameters.
