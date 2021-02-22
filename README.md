@@ -55,7 +55,7 @@ The documentation of the SynchrosphereDemos can be seen as a [tutorial](https://
 
 ## Caveats
 
-The Pappe DSL is more of a proof of concept. It has many shortcommings like:
+The Pappe DSL is more of a proof of concept. It has many shortcomings like:
 
 * No causality checking.
 * Interpreted instead of compiled.

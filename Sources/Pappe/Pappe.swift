@@ -258,7 +258,7 @@ public func `defer`(_ proc: @escaping Proc) -> Stmt {
     Stmt.`defer`(proc)
 }
 
-/// Returns from an activity by returing the result of the given function.
+/// Returns from an activity by returning the result of the given function.
 public func `return`(_ f: @escaping Func) -> Stmt {
     Stmt.exit(f)
 }
