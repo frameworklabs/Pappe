@@ -387,6 +387,7 @@ final class PappeTests: XCTestCase {
  
     func testDefer() {
         var innerVal = false
+        var acc: Int = 0
         Module { name in
             activity (name.Inner, [], []) { val in
                 exec { innerVal = true }
@@ -397,9 +398,15 @@ final class PappeTests: XCTestCase {
                 when { val.cond } abort: {
                     cobegin {
                         strong {
-                            `defer` { val.val = false }
+                            `defer` {
+                                val.val = false
+                                acc *= 2
+                            }
                             exec { val.val = true }
-                            await { false }
+                            `repeat` {
+                                `defer` { acc += 1}
+                                await { false }
+                            }
                         }
                         strong {
                             Pappe.run (name.Inner, [], [])
@@ -417,11 +424,13 @@ final class PappeTests: XCTestCase {
                         exec {
                             val.cond = false
                             val.expect = true
+                            val.accExpect = 0
                         }
                         await { true }
                         exec {
                             val.cond = true
                             val.expect = false
+                            val.accExpect = 2
                         }
                         await { true }
                     }
@@ -431,7 +440,8 @@ final class PappeTests: XCTestCase {
                     weak {
                         always {
                             XCTAssertEqual(val.out as Bool, val.expect)
-                            XCTAssertEqual(innerVal as Bool, val.expect)
+                            XCTAssertEqual(innerVal, val.expect)
+                            XCTAssertEqual(acc, val.accExpect)
                         }
                     }
                 }

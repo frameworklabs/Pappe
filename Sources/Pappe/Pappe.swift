@@ -453,6 +453,8 @@ class BlockProcessor {
     }
     
     deinit {
+        // Clear subProc first so that inner defers also run first!
+        subProc = nil
         for proc in deferedProcs {
             proc()
         }
