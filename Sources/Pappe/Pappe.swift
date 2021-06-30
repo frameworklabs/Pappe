@@ -330,7 +330,7 @@ extension TickResult : Equatable {
 }
 
 /// Callback interface called by asynchronous functions once they are ready.
-public protocol Receiver : class {
+public protocol Receiver : AnyObject {
     var box: Any? { get set }
 
     func postValue(_ val: Any)
@@ -340,6 +340,10 @@ public protocol Receiver : class {
 
 /// Provides information what to do when an async function calls back on `Receive`.
 public struct ReceiveCtx {
+    public init(queue: DispatchQueue, trigger: @escaping Proc) {
+        self.queue = queue
+        self.trigger = trigger
+    }
     public let queue: DispatchQueue
     public let trigger: Proc
 }
