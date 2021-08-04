@@ -132,28 +132,28 @@ public struct Activity {
     }
 }
 
-@_functionBuilder
+@resultBuilder
 public struct StmtBuilder {
     public static func buildBlock(_ stmts: Stmt...) -> [Stmt] {
         stmts
     }
 }
 
-@_functionBuilder
+@resultBuilder
 public struct TrailBuilder {
     public static func buildBlock(_ trails: Trail...) -> [Trail] {
         trails
     }
 }
 
-@_functionBuilder
+@resultBuilder
 public struct MatchBuilder {
     public static func buildBlock(_ matches: Match...) -> [Match] {
         matches
     }
 }
 
-@_functionBuilder
+@resultBuilder
 public struct ActivityBuilder {
     public static func buildBlock(_ acts: Activity...) -> [Activity] {
         acts
@@ -277,6 +277,12 @@ public func nowAndEvery(_ cond: @escaping Cond, do proc: @escaping Proc) -> Stmt
 public func always(_ proc: @escaping Proc) -> Stmt {
     Stmt.repeatUntil([Stmt.exec(proc), Stmt.await(trueCond)], falseCond)
 }
+
+/// 'Unofficial'' statement which pauses until the next step. Equivalent to `await { true }`.
+public let pause = `await` { true }
+
+/// 'Unofficial'' statement which pauses indefinitely. Equivalent to `await { false }`.
+public let halt = `await` { false }
 
 /// Definition of a new activity with name, input and in-out parameters.
 public func activity(_ name: String, _ inParams: [String], _ outParams: [String] = [], @StmtBuilder _ builder: @escaping (Ctx) -> [Stmt]) -> Activity

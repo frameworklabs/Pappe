@@ -21,7 +21,7 @@ final class PappeTests: XCTestCase {
             exec { val.i = val.ticks as Int }
             `while` { val.i > 0 } `repeat`: {
                 exec { val.i -= 1 }
-                await { true }
+                pause
             }
         }
     }
@@ -30,7 +30,7 @@ final class PappeTests: XCTestCase {
         Module { name in
             activity (name.Test, [name.in1, name.in2], [name.out]) { val in
                 exec { val.out = false }
-                await { val.in1 && val.in2 }
+                `await` { val.in1 && val.in2 }
                 exec { val.out = true }
             }
             activity (name.Main, []) { val in
@@ -42,19 +42,19 @@ final class PappeTests: XCTestCase {
                             val.in2 = false
                             val.expect = false
                         }
-                        await { true }
+                        pause
                         exec {
                             val.in1 = true
                             val.in2 = false
                             val.expect = false
                         }
-                        await { true }
+                        pause
                         exec {
                             val.in1 = false
                             val.in2 = true
                             val.expect = false
                         }
-                        await { true }
+                        pause
                         exec {
                             val.in1 = true
                             val.in2 = true
@@ -78,15 +78,15 @@ final class PappeTests: XCTestCase {
         Module { name in
             activity (name.Inner, []) { val in
                 `return` { 42 }
-                await { false }
+                halt
             }
             activity (name.Test, []) { val in
                 when { false } abort: {
                     `repeat` {
-                        await { true }
+                        pause
                         Pappe.run  (name.Inner, []) { res in val.tmp = res }
                         `return` { val.tmp }
-                        await { false }
+                        halt
                     }
                 }
             }
@@ -95,9 +95,9 @@ final class PappeTests: XCTestCase {
                 cobegin {
                     strong {
                         exec { val.expect = 0 }
-                        await { true }
+                        pause
                         exec { val.expect = 42 }
-                        await { true }
+                        pause
                     }
                     weak {
                         Pappe.run  (name.Test, []) { res in val.out = res }
@@ -139,11 +139,11 @@ final class PappeTests: XCTestCase {
                 cobegin {
                     strong {
                         exec { val.expect = false }
-                        await { true }
+                        pause
                         exec { val.expect = false }
-                        await { true }
+                        pause
                         exec { val.expect = false }
-                        await { true }
+                        pause
                         exec { val.expect = true }
                     }
                     weak {
@@ -165,7 +165,7 @@ final class PappeTests: XCTestCase {
                 exec { val.i = 3 }
                 `repeat` {
                     exec { val.i -= 1 }
-                    await { true }
+                    pause
                 } until: { val.i == 0 }
                 exec { val.done = true }
             }
@@ -173,7 +173,7 @@ final class PappeTests: XCTestCase {
                 exec { val.i = 3 }
                 `while` { val.i > 0 } repeat: {
                     exec { val.i -= 1 }
-                    await { true }
+                    pause
                 }
                 exec { val.done = true }
             }
@@ -185,11 +185,11 @@ final class PappeTests: XCTestCase {
                 cobegin {
                     strong {
                         exec { val.expect = false }
-                        await { true }
+                        pause
                         exec { val.expect = false }
-                        await { true }
+                        pause
                         exec { val.expect = false }
-                        await { true }
+                        pause
                         exec { val.expect = true }
                     }
                     weak {
@@ -214,9 +214,9 @@ final class PappeTests: XCTestCase {
             activity (name.Test, [], [name.pos]) { val in
                 when { true } abort: {
                     exec { val.pos = 1 }
-                    await { true }
+                    pause
                     exec { val.pos = 2 }
-                    await { true }
+                    pause
                 }
                 exec { val.pos = 3 }
             }
@@ -225,7 +225,7 @@ final class PappeTests: XCTestCase {
                 cobegin {
                     strong {
                         exec { val.expect = 1 }
-                        await { true }
+                        pause
                         exec { val.expect = 3 }
                     }
                     weak {
@@ -247,13 +247,13 @@ final class PappeTests: XCTestCase {
                 when { val.outer } abort: {
                     when { val.inner } abort: {
                         exec { val.reachedInner = true }
-                        await { false }
+                        halt
                     }
                     exec { val.seenInner = true }
-                    await { false }
+                    halt
                 }
                 exec { val.seenOuter = true }
-                await { false }
+                halt
             }
             activity (name.Main, []) { val in
                 exec {
@@ -269,14 +269,14 @@ final class PappeTests: XCTestCase {
                             val.expectedOuter = false
                             val.expectedInner = false
                         }
-                        await { true }
+                        pause
                         exec {
                             val.outer = true
                             val.inner = true
                             val.expectedOuter = true
                             val.expectedInner = false
                         }
-                        await { true }
+                        pause
                     }
                     weak {
                         Pappe.run (name.Test, [val.outer, val.inner], [val.loc.reachedInner, val.loc.seenOuter, val.loc.seenInner])
@@ -303,77 +303,77 @@ final class PappeTests: XCTestCase {
                             val.step = 0
                             val.expectedStep = 1
                         }
-                        await { true }
+                        pause
                         exec { val.expectedStep = 2 }
-                        await { true }
+                        pause
                         exec { val.expectedStep = 3 }
-                        await { true }
+                        pause
                         
                         exec { val.expectedStep = 1 }
-                        await { true }
+                        pause
                         exec {
                             val.cond = true
                             val.expectedStep = 2
                         }
-                        await { true }
+                        pause
                         exec {
                             val.cond = false
                             val.expectedStep = 12
                         }
-                        await { true }
+                        pause
                         exec { val.expectedStep = 112 }
-                        await { true }
+                        pause
                         
                         exec { val.expectedStep = 1 }
-                        await { true }
+                        pause
                         exec {
                             val.innerCond = true
                             val.expectedStep = 2
                         }
-                        await { true }
+                        pause
                         exec {
                             val.innerCond = false
                             val.expectedStep = 12
                         }
-                        await { true }
+                        pause
                         exec { val.expectedStep = 112 }
-                        await { true }
+                        pause
                         exec { val.expectedStep = 1112 }
-                        await { true }
+                        pause
                     }
                     weak {
                         when { val.cond } reset: {
                             exec { val.step = 1 }
-                            await { true }
+                            pause
                             exec { val.step = 2}
-                            await { true }
+                            pause
                         }
                         exec { val.step = 3 }
-                        await { true }
+                        pause
                         
                         exec { val.step = 0 }
                         when { val.cond } reset: {
                             exec { val.step = val.step + 1 }
-                            await { true }
+                            pause
                             exec { val.step = val.step + 10 }
-                            await { true }
+                            pause
                         }
                         exec { val.step = val.step + 100 }
-                        await { true }
+                        pause
                         
                         exec { val.step = 0 }
                         when { val.cond } reset: {
                             when { val.innerCond } reset: {
                                 exec { val.step = val.step + 1 }
-                                await { true }
+                                pause
                                 exec { val.step = val.step + 10 }
-                                await { true }
+                                pause
                             }
                             exec { val.step = val.step + 100 }
-                            await { true }
+                            pause
                         }
                         exec { val.step = val.step + 1000 }
-                        await { true }
+                        pause
                     }
                     weak {
                         always {
@@ -392,7 +392,7 @@ final class PappeTests: XCTestCase {
             activity (name.Inner, [], []) { val in
                 exec { innerVal = true }
                 `defer` { innerVal = false }
-                await { false }
+                halt
             }
             activity (name.Test, [name.cond], [name.val]) { val in
                 when { val.cond } abort: {
@@ -405,7 +405,7 @@ final class PappeTests: XCTestCase {
                             exec { val.val = true }
                             `repeat` {
                                 `defer` { acc += 1}
-                                await { false }
+                                halt
                             }
                         }
                         strong {
@@ -413,7 +413,7 @@ final class PappeTests: XCTestCase {
                         }
                     }
                 }
-                await { false }
+                halt
             }
             activity (name.Main, []) { val in
                 exec {
@@ -426,13 +426,13 @@ final class PappeTests: XCTestCase {
                             val.expect = true
                             val.accExpect = 0
                         }
-                        await { true }
+                        pause
                         exec {
                             val.cond = true
                             val.expect = false
                             val.accExpect = 2
                         }
-                        await { true }
+                        pause
                     }
                     weak {
                         Pappe.run (name.Test, [val.cond], [val.loc.out])
@@ -454,7 +454,7 @@ final class PappeTests: XCTestCase {
         let m = Module { name in
             activity (name.Main, []) { val in
                 `defer` { didCallDefer = true }
-                await { true }
+               pause
             }
         }
         let p = try! Processor(module: m)
@@ -481,7 +481,7 @@ final class PappeTests: XCTestCase {
                             exec { val.pos = 3 }
                         }
                     }
-                    await { true }
+                    pause
                 }
             }
             activity (name.Test2, [name.val], [name.pos]) { val in
@@ -495,7 +495,7 @@ final class PappeTests: XCTestCase {
                             exec { val.pos = 3 }
                         }
                     }
-                    await { true }
+                    pause
                 }
             }
             activity (name.Main, []) { val in
@@ -506,11 +506,11 @@ final class PappeTests: XCTestCase {
                 cobegin {
                     strong {
                         exec { val.test = 1 }
-                        await { true }
+                        pause
                         exec { val.test = 2 }
-                        await { true }
+                        pause
                         exec { val.test = 3 }
-                        await { true }
+                        pause
                     }
                     weak {
                         Pappe.run (name.Test1, [val.test], [val.loc.pos1])
@@ -547,7 +547,7 @@ final class PappeTests: XCTestCase {
                     }
                     weak {
                         exec { val.expected2 = false }
-                        await { true }
+                        pause
                         always { val.expected2 = val.alternating as Bool }
                     }
                     weak {

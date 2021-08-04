@@ -18,7 +18,7 @@ let m = Module { name in
         exec { val.i = val.ticks as Int }
         while { val.i > 0 } repeat: {
             exec { val.i -= 1 }
-            await { true }
+            pause
         }
     }
     activity (name.Main, []) { val in
@@ -30,14 +30,14 @@ let m = Module { name in
                 `repeat` {
                     run (name.Wait, [2])
                     exec { print("on every third") }
-                    await { true }
+                    pause
                 }
             }
             weak {
                 `repeat` {
                     run (name.Wait, [1])
                     exec { print("on every second") }
-                    await { true }
+                    pause
                 }
             }
         }
