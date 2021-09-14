@@ -587,6 +587,49 @@ final class PappeTests: XCTestCase {
         }
     }
     
+    func testMetaRun() {
+        Module { name in
+            activity (name.Target1, [], [name.tok]) { val in
+                exec { val.tok = Int(1) }
+                pause
+            }
+            activity (name.Target2, [], [name.tok]) { val in
+                exec { val.tok = Int(2) }
+                pause
+            }
+            activity (name.Meta, [name.target], [name.tok]) { val in
+                Pappe.run (val.target, [], [val.loc.tok])
+            }
+            activity (name.Main, []) { val in
+                exec { val.result = Int(0) }
+                cobegin {
+                    strong {
+                        exec {
+                            val.target = "Target1"
+                            val.expected = Int(1)
+                        }
+                        pause
+                        exec {
+                            val.target = "Target2"
+                            val.expected = Int(2)
+                        }
+                        pause
+                    }
+                    weak {
+                        `repeat` {
+                            Pappe.run (name.Meta, [val.target], [val.loc.result])
+                        }
+                    }
+                    weak {
+                        always {
+                            XCTAssertEqual(val.result as Int, val.expected as Int)
+                        }
+                    }
+                }
+            }
+        }.test(steps: 10)
+    }
+    
     static var allTests = [
         ("testAwait", testAwait),
         ("testReturn", testReturn),
@@ -600,5 +643,6 @@ final class PappeTests: XCTestCase {
         ("testSelectAndIf", testSelectAndIf),
         ("testEvery", testEvery),
         ("testLoc", testLoc),
+        ("testMetaRun", testMetaRun),
     ]
 }

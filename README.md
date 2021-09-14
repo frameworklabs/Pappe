@@ -50,6 +50,7 @@ For more extensive code examples, please have a look at:
 * [Unit Tests](https://github.com/frameworklabs/Pappe/blob/master/Tests/PappeTests/PappeTests.swift)
 * [BlinkerPappe](https://github.com/frameworklabs/BlinkerPappe) project. The Pappe code can be found in [this file](https://github.com/frameworklabs/BlinkerPappe/blob/master/BlinkerPappe/GameScene.swift).
 * The [Synchrosphere](https://github.com/frameworklabs/Synchrosphere) project as well as the [SynchrosphereDemo](https://github.com/frameworklabs/SynchrosphereDemo) App which allows to control Sphero robots via imperative synchronous code. 
+* [RangeExtender](https://github.com/frameworklabs/RangeExtender) which uses Pappe to simplify the setup and management of a Bluetooth LE connection.
 
 The documentation of the SynchrosphereDemos can be seen as a [tutorial](https://github.com/frameworklabs/SynchrosphereDemo/blob/main/README.md#io-demos) for the Pappe language, as it explains its language constructs with concrete examples.
 

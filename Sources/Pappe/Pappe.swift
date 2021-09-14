@@ -85,6 +85,7 @@ public struct ID {
 public typealias Proc = () -> Void
 public typealias Func = () -> Any
 public typealias LFunc = () -> Loc
+public typealias SFunc = () -> String
 public typealias PFunc = (Receiver) -> Void
 public typealias MFunc = () -> [Any]
 public typealias MLFunc = () -> [Loc]
@@ -97,7 +98,7 @@ let falseCond: Cond = { false }
 public enum Stmt {
     case await(Cond)
     case receive(LFunc, Any?, PFunc)
-    case run(String, MFunc, MLFunc, ResFunc?)
+    case run(SFunc, MFunc, MLFunc, ResFunc?)
     case cobegin([Trail])
     case repeatUntil([Stmt], Cond)
     case whenAbort(Cond, [Stmt])
@@ -171,7 +172,7 @@ public func receive(_ outArg: @autoclosure @escaping LFunc, resetTo value: Any? 
 }
 
 /// Runs the activity with the given `name` passing `inArgs` and `outArgs` to/from it in every step. When the activity ends, a result might be passed in the final closure.
-public func run(_ name: String, _ inArgs: @autoclosure @escaping MFunc, _ outArgs: @autoclosure @escaping MLFunc = [], _ res: ResFunc? = nil) -> Stmt {
+public func run(_ name: @autoclosure @escaping SFunc, _ inArgs: @autoclosure @escaping MFunc, _ outArgs: @autoclosure @escaping MLFunc = [], _ res: ResFunc? = nil) -> Stmt {
     Stmt.run(name, inArgs, outArgs, res)
 }
 
@@ -503,10 +504,11 @@ class BlockProcessor {
                 pc.inc()
                 
             case let .run(a, inArgs, outArgs, resFunc):
-                guard let act = procCtx.module[a] else {
-                    throw Errors.activityNotFound(a)
-                }
                 if subProc == nil {
+                    let name = a()
+                    guard let act = procCtx.module[name] else {
+                        throw Errors.activityNotFound(name)
+                    }
                     subProc = ActivityProcessor(act: act, procCtx: procCtx)
                 }
                 let res = try (subProc as! ActivityProcessor).tick(inArgs(), outArgs())
