@@ -737,6 +737,104 @@ final class PappeTests: XCTestCase {
             }
         }.test(steps: 10)
     }
+    
+    func testPar() {
+        Module { name in
+            activity (name.Main, []) { val in
+                cobegin {
+                    with (.parallel) {
+                        parbegin {
+                            with {
+                                always {
+                                    dispatchPrecondition(condition: .onQueue(DispatchQueue.main))
+                                }
+                            }
+                            with {
+                                always {
+                                    dispatchPrecondition(condition: .notOnQueue(DispatchQueue.main))
+                                }
+                            }
+                            with {
+                                always {
+                                    dispatchPrecondition(condition: .notOnQueue(DispatchQueue.main))
+                                }
+                            }
+                        }
+                    }
+                    with (.parallel) {
+                        cobegin {
+                            with (.parallel) {
+                                always {
+                                    dispatchPrecondition(condition: .notOnQueue(DispatchQueue.main))
+                                }
+                            }
+                            with (.parallel) {
+                                always {
+                                    dispatchPrecondition(condition: .notOnQueue(DispatchQueue.main))
+                                }
+                            }
+                        }
+                    }
+                    with {
+                        always {
+                            dispatchPrecondition(condition: .onQueue(DispatchQueue.main))
+                        }
+                    }
+                    with (.parallel) {
+                        always {
+                            dispatchPrecondition(condition: .onQueue(DispatchQueue.main))
+                        }
+                    }
+                    with {
+                        halt
+                    }
+                    with (.parallel) {
+                        always {
+                            dispatchPrecondition(condition: .onQueue(DispatchQueue.main))
+                        }
+                    }
+                    with ([.parallel, .weak]) {
+                        always {
+                            dispatchPrecondition(condition: .notOnQueue(DispatchQueue.main))
+                        }
+                    }
+                }
+            }
+        }.test(steps: 10)
+    }
+    
+    func testParPrev() {
+        Module { name in
+            activity (name.Main, []) { val in
+                exec {
+                    val.x = 0
+                    val.y = 0
+                    val.xx = 0
+                    val.yy = 0
+                }
+                cobegin {
+                    with (.parallel) {
+                        always {
+                            val.x += 1
+                        }
+                    }
+                    with (.parallel) {
+                        pause
+                        always {
+                            val.y += val.prev.x as Int
+                        }
+                    }
+                    with (.weak) {
+                        always {
+                            val.yy += val.xx as Int
+                            val.xx += 1
+                            XCTAssertEqual(val.yy, val.y as Int)
+                        }
+                    }
+                }
+            }
+        }.test(steps: 10)
+    }
 
     static var allTests = [
         ("testAwait", testAwait),
@@ -755,5 +853,7 @@ final class PappeTests: XCTestCase {
         ("testPrev", testPrev),
         ("testPrev2", testPrev2),
         ("testPrev3", testPrev3),
+        ("testPar", testPar),
+        ("testParPrev", testParPrev),
     ]
 }

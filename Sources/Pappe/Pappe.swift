@@ -27,7 +27,7 @@ public class DirectLoc : Loc {
 
 struct CtxLoc : Loc {
     let name: String
-    unowned var ctx: Ctx
+    unowned let ctx: Ctx
     
     var val: Any {
         get {
@@ -78,6 +78,7 @@ public class PrevCtx
 @dynamicMemberLookup
 public class Ctx {
     private var map: [String: Any] = [:]
+    private let semaphore = DispatchSemaphore(value: 1)
     
     /// Access to the location factory.
     public lazy var loc: Locs = Locs(ctx: self)
@@ -88,18 +89,30 @@ public class Ctx {
     /// Get and set a variable by member lookup.
     public subscript<T>(dynamicMember name: String) -> T {
         get {
-            if let val = map[name] {
-                return val as! T
+            synchronized {
+                if let val = map[name] {
+                    return val as! T
+                }
+                fatalError("\(name) is not a variable!")
             }
-            fatalError("\(name) is not a variable!")
         }
         set {
-            map[name] = newValue
+            synchronized {
+                map[name] = newValue
+            }
         }
     }
     
     func setPrevFromNow() {
-        prev.map = map
+        synchronized {
+            prev.map = map
+        }
+    }
+
+    private func synchronized<T>(_ f: () -> T) -> T {
+        semaphore.wait()
+        defer { semaphore.signal() }
+        return f()
     }
 }
 
@@ -130,7 +143,7 @@ public enum Stmt {
     case await(Cond)
     case receive(LFunc, Any?, PFunc)
     case run(SFunc, MFunc, MLFunc, ResFunc?)
-    case cobegin([Trail])
+    case cobegin([Trail], parallel: Bool)
     case repeatUntil([Stmt], Cond)
     case whenAbort(Cond, [Stmt])
     case select([Match])
@@ -149,6 +162,9 @@ public struct TrailOptions : OptionSet {
     
     /// Mark this trail as weak - it will be strong otherwise.
     public static let weak = TrailOptions(rawValue: 1)
+
+    /// Marks this trail as prarallel - will be scope defined otherwise.
+    public static let parallel = TrailOptions(rawValue: 2)
 }
 
 public struct Trail {
@@ -221,9 +237,15 @@ public func run(_ name: @autoclosure @escaping SFunc, _ inArgs: @autoclosure @es
 
 /// Begins scope of concurrent trails.
 public func cobegin(@TrailBuilder _ builder: () -> [Trail]) -> Stmt {
-    Stmt.cobegin(builder())
+    Stmt.cobegin(builder(), parallel: false)
 }
 
+/// Begins scope of parallel trails.
+public func parbegin(@TrailBuilder _ builder: () -> [Trail]) -> Stmt {
+    Stmt.cobegin(builder(), parallel: true)
+}
+
+/// A trail with the specified options like `.weak` or `.parallel`.
 public func with(_ opts: TrailOptions = [], @StmtBuilder _ builder: () -> [Stmt]) -> Trail {
     Trail(opts: opts, stmts: builder())
 }
@@ -586,9 +608,9 @@ class BlockProcessor {
                     return res
                 }
 
-            case let .cobegin(ts):
+            case let .cobegin(ts, isParallel):
                 if subProc == nil {
-                    subProc = CobeginProcessor(trails: ts, procCtx: procCtx)
+                    subProc = CobeginProcessor(trails: ts, isParallel: isParallel, procCtx: procCtx)
                 }
                 let res = try (subProc as! CobeginProcessor).tick()
                 if res == .wait {
@@ -709,11 +731,25 @@ class ReceiveProcessor : Receiver {
 
 class CobeginProcessor {
     private let tps: [TrailProcessor]
+    private let isParallel: Bool
     
-    init(trails: [Trail], procCtx: ProcessorCtx) {
+    class ParRes {
+        let isStrong: Bool
+        var res: TickResult? = nil
+
+        init(_ isStrong: Bool) {
+            self.isStrong = isStrong
+        }
+    }
+    private var parResults = [ParRes]()
+    
+    private let group = DispatchGroup()
+    
+    init(trails: [Trail], isParallel: Bool, procCtx: ProcessorCtx) {
         tps = trails.map { trail in
             return TrailProcessor(opts: trail.opts, stmts: trail.stmts, procCtx: procCtx)
         }
+        self.isParallel = isParallel
     }
     
     func tick() throws -> TickResult {
@@ -721,10 +757,9 @@ class CobeginProcessor {
         var doneWeak = 0
         var numStrong = 0
         
-        for tp in tps {
-            let res = try tp.tick()
+        func updateStats(res: TickResult, isStrong: Bool) throws {
             if res == .done {
-                if tp.strong {
+                if isStrong {
                     doneStrong += 1
                 } else {
                     doneWeak += 1
@@ -733,10 +768,55 @@ class CobeginProcessor {
             else if res != .wait {
                 throw Errors.returnNotAllowed
             }
-            if tp.strong {
+            if isStrong {
                 numStrong += 1
             }
         }
+        
+        let queue = DispatchQueue.global()
+        var parMode = false
+        var firstParTrailProc: TrailProcessor?
+        
+        func finishParMode() throws {
+            guard parMode else { return }
+            
+            if let tp = firstParTrailProc {
+                let res = try tp.tick()
+                try updateStats(res: res, isStrong: tp.strong)
+                firstParTrailProc = nil
+            }
+            group.wait()
+            parMode = false
+        }
+        
+        for tp in tps {
+            if isParallel || tp.parallel {
+                if !parMode {
+                    firstParTrailProc = tp
+                }
+                else {
+                    let parRes = ParRes(tp.strong)
+                    parResults.append(parRes)
+                    
+                    queue.async(group: group) { [unowned parRes, unowned tp] in
+                        parRes.res = try! tp.tick()
+                    }
+                }
+                parMode = true
+            }
+            else {
+                try finishParMode()
+                let res = try tp.tick()
+                try updateStats(res: res, isStrong: tp.strong)
+            }
+        }
+        try finishParMode()
+        
+        for parRes in parResults {
+            try updateStats(res: parRes.res!, isStrong: parRes.isStrong)
+        }
+        parResults.removeAll(keepingCapacity: true)
+
         return (doneStrong == numStrong && numStrong > 0) || (doneWeak > 0 && numStrong == 0) ? .done : .wait
     }
 }
@@ -745,6 +825,9 @@ class TrailProcessor : BlockProcessor {
     let opts: TrailOptions
     var strong: Bool {
         return !opts.contains(.weak)
+    }
+    var parallel: Bool {
+        return opts.contains(.parallel)
     }
     
     init(opts: TrailOptions, stmts: [Stmt], procCtx: ProcessorCtx) {
