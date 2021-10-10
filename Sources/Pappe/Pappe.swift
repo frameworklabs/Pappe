@@ -50,6 +50,30 @@ public struct Locs {
     }
 }
 
+/// Stores the previous values of the context variables for read only.
+@dynamicMemberLookup
+public class PrevCtx
+{
+    var map: [String: Any] = [:]
+
+    /// Get a variable by member lookup.
+    public subscript<T>(dynamicMember name: String) -> T {
+        if let val = map[name] {
+            return val as! T
+        }
+        fatalError("\(name) is not a variable!")
+    }
+    
+    /// Get a variable or a fallback value by subscript: `val.prev[name.x, or: 0]`.
+    public subscript<T>(_ name: String, or defaultVal: T) -> T {
+        if let val = map[name] {
+            return val as! T
+        } else {
+            return defaultVal
+        }
+    }
+}
+
 /// Stores local variables like in Python.
 @dynamicMemberLookup
 public class Ctx {
@@ -57,6 +81,9 @@ public class Ctx {
     
     /// Access to the location factory.
     public lazy var loc: Locs = Locs(ctx: self)
+    
+    /// Access to the previous context values.
+    public let prev: PrevCtx =  PrevCtx();
         
     /// Get and set a variable by member lookup.
     public subscript<T>(dynamicMember name: String) -> T {
@@ -69,6 +96,10 @@ public class Ctx {
         set {
             map[name] = newValue
         }
+    }
+    
+    func setPrevFromNow() {
+        prev.map = map
     }
 }
 
@@ -437,6 +468,7 @@ class ActivityProcessor {
     }
     
     func tick(_ inArgs: [Any], _ outArgs: [Loc]) throws -> TickResult {
+        ctx.setPrevFromNow()
         act.bindInArgs(inArgs, ctx)
         act.bindInOutArgs(outArgs, ctx)
         let res = try bp.tick()

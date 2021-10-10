@@ -629,7 +629,115 @@ final class PappeTests: XCTestCase {
             }
         }.test(steps: 10)
     }
+
+    func testPrev() {
+        Module { name in
+            activity (name.A, [name.x]) { val in
+                exec {
+                    XCTAssertEqual(val.x, 2)
+                }
+                pause
+                exec {
+                    val.x = 3
+                    XCTAssertEqual(val.prev.x, 2)
+                }
+                halt
+            }
+            activity (name.Main, []) { val in
+                exec {
+                    XCTAssertEqual(val.prev[name.i, or: 0], 0)
+                    val.i = 1
+                }
+                pause
+                exec {
+                    val.i = 2
+                    XCTAssertEqual(val.prev.i, 1)
+                }
+                Pappe.run (name.A, [val.i])
+            }
+        }.test(steps: 10)
+    }
     
+    func testPrev2() {
+        Module { name in
+            activity (name.A, [name.x], [name.y]) { val in
+                `repeat` {
+                    exec {
+                        val.prevX = val.x as Int
+                        val.y += 1
+                        val.prevY = val.y as Int
+                    }
+                    pause
+                    exec {
+                        XCTAssertEqual(val.prev.x, val.prevX as Int)
+                        XCTAssertEqual(val.prev.y, val.prevY as Int)
+                    }
+                }
+            }
+            activity (name.Main, []) { val in
+                exec {
+                    val.x = 1
+                    XCTAssertEqual(val.prev[name.x, or: 0], 0)
+                }
+                pause
+                exec {
+                    XCTAssertEqual(val.prev.x, 1)
+                    val.x = 2
+                    XCTAssertEqual(val.x, 2)
+                    XCTAssertEqual(val.prev.x, 1)
+                }
+                
+                exec { 
+                    val.i = 0
+                    val.j = 0
+                }
+                cobegin {
+                    strong {
+                        always {
+                            val.i += 1
+                        }
+                    }
+                    strong {
+                        Pappe.run (name.A, [val.i], [val.loc.j])
+                    }
+                    strong {
+                        always {
+                            XCTAssertEqual(val.i, val.j as Int)
+                        }
+                    }
+                }
+            }
+        }.test(steps: 10)
+    }
+    
+    func testPrev3() {
+        Module { name in
+            activity (name.Main, []) { val in
+                exec {
+                    val.i = 0
+                    val.o = false
+                }
+                cobegin {
+                    weak {
+                        pause
+                        exec { val.i = 1 }
+                    }
+                    strong {
+                        when { val.i as Int != val.prev.i } abort: {
+                            halt
+                        }
+                        exec { val.o = true }
+                    }
+                    weak {
+                        exec { XCTAssertFalse(val.o) }
+                        pause
+                        exec { XCTAssertTrue(val.o) }
+                    }
+                }
+            }
+        }.test(steps: 10)
+    }
+
     static var allTests = [
         ("testAwait", testAwait),
         ("testReturn", testReturn),
@@ -644,5 +752,8 @@ final class PappeTests: XCTestCase {
         ("testEvery", testEvery),
         ("testLoc", testLoc),
         ("testMetaRun", testMetaRun),
+        ("testPrev", testPrev),
+        ("testPrev2", testPrev2),
+        ("testPrev3", testPrev3),
     ]
 }
