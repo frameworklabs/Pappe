@@ -139,9 +139,21 @@ public enum Stmt {
     case exit(Func)
 }
 
-public enum Trail {
-    case strong([Stmt])
-    case weak([Stmt])
+/// Options for a trail.
+public struct TrailOptions : OptionSet {
+    public let rawValue: Int
+    
+    public init(rawValue: Int) {
+        self.rawValue = rawValue
+    }
+    
+    /// Mark this trail as weak - it will be strong otherwise.
+    public static let weak = TrailOptions(rawValue: 1)
+}
+
+public struct Trail {
+    let opts: TrailOptions
+    let stmts: [Stmt]
 }
 
 public typealias Match = (Cond, [Stmt])
@@ -212,14 +224,20 @@ public func cobegin(@TrailBuilder _ builder: () -> [Trail]) -> Stmt {
     Stmt.cobegin(builder())
 }
 
+public func with(_ opts: TrailOptions = [], @StmtBuilder _ builder: () -> [Stmt]) -> Trail {
+    Trail(opts: opts, stmts: builder())
+}
+
 /// A trail which will determine the life-cycle of a `cobegin` statement.
+@available(*, deprecated, renamed: "with")
 public func strong(@StmtBuilder _ builder: () -> [Stmt]) -> Trail {
-    Trail.strong(builder())
+    Trail(opts: [], stmts: builder())
 }
 
 /// A trail which can be preempted at the end of a step if all strong trails have finished.
+@available(*, deprecated, message: "use `with (.weak)` instead")
 public func weak(@StmtBuilder _ builder: () -> [Stmt]) -> Trail {
-    Trail.weak(builder())
+    Trail(opts: .weak, stmts: builder())
 }
 
 /// Checks `cond` at the beginning of each  loop and enters it if `true`.
@@ -694,12 +712,7 @@ class CobeginProcessor {
     
     init(trails: [Trail], procCtx: ProcessorCtx) {
         tps = trails.map { trail in
-            switch trail {
-            case .strong(let ss):
-                return TrailProcessor(stmts: ss, procCtx: procCtx, strong: true)
-            case .weak(let ss):
-                return TrailProcessor(stmts: ss, procCtx: procCtx, strong: false)
-            }
+            return TrailProcessor(opts: trail.opts, stmts: trail.stmts, procCtx: procCtx)
         }
     }
     
@@ -729,10 +742,13 @@ class CobeginProcessor {
 }
 
 class TrailProcessor : BlockProcessor {
-    let strong: Bool
+    let opts: TrailOptions
+    var strong: Bool {
+        return !opts.contains(.weak)
+    }
     
-    init(stmts: [Stmt], procCtx: ProcessorCtx, strong: Bool) {
-        self.strong = strong
+    init(opts: TrailOptions, stmts: [Stmt], procCtx: ProcessorCtx) {
+        self.opts = opts
         super.init(stmts: stmts, procCtx: procCtx)
     }
 }

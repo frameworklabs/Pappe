@@ -36,7 +36,7 @@ final class PappeTests: XCTestCase {
             activity (name.Main, []) { val in
                 exec { val.out =  false }
                 cobegin {
-                    strong {
+                    with {
                         exec {
                             val.in1 = false
                             val.in2 = false
@@ -61,10 +61,10 @@ final class PappeTests: XCTestCase {
                             val.expect = true
                         }
                     }
-                    weak {
+                    with (.weak) {
                         Pappe.run (name.Test, [val.in1, val.in2], [val.loc.out])
                     }
-                    weak {
+                    with (.weak) {
                         always {
                             XCTAssertEqual(val.out as Bool, val.expect)
                         }
@@ -93,16 +93,16 @@ final class PappeTests: XCTestCase {
             activity (name.Main, []) { val in
                 exec { val.out = 0 }
                 cobegin {
-                    strong {
+                    with {
                         exec { val.expect = 0 }
                         pause
                         exec { val.expect = 42 }
                         pause
                     }
-                    weak {
+                    with (.weak) {
                         Pappe.run  (name.Test, []) { res in val.out = res }
                     }
-                    weak {
+                    with (.weak) {
                         always {
                             XCTAssertEqual(val.out as Int, val.expect)
                         }
@@ -116,19 +116,19 @@ final class PappeTests: XCTestCase {
         Module(imports: [common]) { name in
             activity (name.Test, [], [name.done]) { val in
                 cobegin {
-                    strong {
+                    with {
                         Pappe.run (name.Delay, [1])
                     }
-                    strong {
+                    with {
                         Pappe.run (name.Delay, [3])
                     }
-                    strong {
+                    with {
                         Pappe.run (name.Delay, [2])
                     }
-                    weak {
+                    with (.weak) {
                         Pappe.run (name.Delay, [2])
                     }
-                    weak {
+                    with (.weak) {
                         Pappe.run (name.Delay, [4])
                     }
                 }
@@ -137,7 +137,7 @@ final class PappeTests: XCTestCase {
             activity (name.Main, []) { val in
                 exec { val.out = false }
                 cobegin {
-                    strong {
+                    with {
                         exec { val.expect = false }
                         pause
                         exec { val.expect = false }
@@ -146,10 +146,10 @@ final class PappeTests: XCTestCase {
                         pause
                         exec { val.expect = true }
                     }
-                    weak {
+                    with (.weak) {
                         Pappe.run (name.Test, [], [val.loc.out])
                     }
-                    weak {
+                    with (.weak) {
                         always {
                             XCTAssertEqual(val.out as Bool, val.expect)
                         }
@@ -183,7 +183,7 @@ final class PappeTests: XCTestCase {
                     val.outWhileRepeat = false
                 }
                 cobegin {
-                    strong {
+                    with {
                         exec { val.expect = false }
                         pause
                         exec { val.expect = false }
@@ -192,13 +192,13 @@ final class PappeTests: XCTestCase {
                         pause
                         exec { val.expect = true }
                     }
-                    weak {
+                    with (.weak) {
                         Pappe.run (name.TestRepeatUntil, [], [val.loc.outRepeatUntil])
                     }
-                    weak {
+                    with (.weak) {
                         Pappe.run (name.TestWhileRepeat, [], [val.loc.outWhileRepeat])
                     }
-                    weak {
+                    with (.weak) {
                         always {
                             XCTAssertEqual(val.outRepeatUntil as Bool, val.expect)
                             XCTAssertEqual(val.outWhileRepeat as Bool, val.expect)
@@ -223,15 +223,15 @@ final class PappeTests: XCTestCase {
             activity (name.Main, []) { val in
                 exec { val.out = 0 }
                 cobegin {
-                    strong {
+                    with {
                         exec { val.expect = 1 }
                         pause
                         exec { val.expect = 3 }
                     }
-                    weak {
+                    with (.weak) {
                         Pappe.run (name.Test, [], [val.loc.out])
                     }
-                    weak {
+                    with (.weak) {
                         always {
                             XCTAssertEqual(val.out as Int, val.expect)
                         }
@@ -262,7 +262,7 @@ final class PappeTests: XCTestCase {
                     val.seenInner = false
                 }
                 cobegin {
-                    strong {
+                    with {
                         exec {
                             val.outer = false
                             val.inner = false
@@ -278,10 +278,10 @@ final class PappeTests: XCTestCase {
                         }
                         pause
                     }
-                    weak {
+                    with (.weak) {
                         Pappe.run (name.Test, [val.outer, val.inner], [val.loc.reachedInner, val.loc.seenOuter, val.loc.seenInner])
                     }
-                    weak {
+                    with (.weak) {
                         always {
                             XCTAssertEqual(val.reachedInner as Bool, true)
                             XCTAssertEqual(val.seenOuter as Bool, val.expectedOuter)
@@ -297,7 +297,7 @@ final class PappeTests: XCTestCase {
         Module { name in
             activity (name.Main, []) { val in
                 cobegin {
-                    strong {
+                    with {
                         exec {
                             val.cond = false
                             val.step = 0
@@ -341,7 +341,7 @@ final class PappeTests: XCTestCase {
                         exec { val.expectedStep = 1112 }
                         pause
                     }
-                    weak {
+                    with (.weak) {
                         when { val.cond } reset: {
                             exec { val.step = 1 }
                             pause
@@ -375,7 +375,7 @@ final class PappeTests: XCTestCase {
                         exec { val.step = val.step + 1000 }
                         pause
                     }
-                    weak {
+                    with (.weak) {
                         always {
                             XCTAssertEqual(val.step as Int, val.expectedStep)
                         }
@@ -397,7 +397,7 @@ final class PappeTests: XCTestCase {
             activity (name.Test, [name.cond], [name.val]) { val in
                 when { val.cond } abort: {
                     cobegin {
-                        strong {
+                        with {
                             `defer` {
                                 val.val = false
                                 acc *= 2
@@ -408,7 +408,7 @@ final class PappeTests: XCTestCase {
                                 halt
                             }
                         }
-                        strong {
+                        with {
                             Pappe.run (name.Inner, [], [])
                         }
                     }
@@ -420,7 +420,7 @@ final class PappeTests: XCTestCase {
                     val.out = false
                 }
                 cobegin {
-                    strong {
+                    with {
                         exec {
                             val.cond = false
                             val.expect = true
@@ -434,10 +434,10 @@ final class PappeTests: XCTestCase {
                         }
                         pause
                     }
-                    weak {
+                    with (.weak) {
                         Pappe.run (name.Test, [val.cond], [val.loc.out])
                     }
-                    weak {
+                    with (.weak) {
                         always {
                             XCTAssertEqual(val.out as Bool, val.expect)
                             XCTAssertEqual(innerVal, val.expect)
@@ -504,7 +504,7 @@ final class PappeTests: XCTestCase {
                     val.pos2 = 0
                 }
                 cobegin {
-                    strong {
+                    with {
                         exec { val.test = 1 }
                         pause
                         exec { val.test = 2 }
@@ -512,13 +512,13 @@ final class PappeTests: XCTestCase {
                         exec { val.test = 3 }
                         pause
                     }
-                    weak {
+                    with (.weak) {
                         Pappe.run (name.Test1, [val.test], [val.loc.pos1])
                     }
-                    weak {
+                    with (.weak) {
                         Pappe.run (name.Test2, [val.test], [val.loc.pos2])
                     }
-                    weak {
+                    with (.weak) {
                         always {
                             XCTAssertEqual(val.pos1 as Int, val.test)
                             XCTAssertEqual(val.pos2 as Int, val.test)
@@ -534,7 +534,7 @@ final class PappeTests: XCTestCase {
             activity (name.Main, []) { val in
                 exec { val.alternating = false }
                 cobegin {
-                    weak {
+                    with (.weak) {
                         always {
                             val.res1 = false
                             val.res2 = false
@@ -542,25 +542,25 @@ final class PappeTests: XCTestCase {
                             val.alternating = !alternating
                         }
                     }
-                    weak {
+                    with (.weak) {
                         always { val.expected1 = val.alternating as Bool }
                     }
-                    weak {
+                    with (.weak) {
                         exec { val.expected2 = false }
                         pause
                         always { val.expected2 = val.alternating as Bool }
                     }
-                    weak {
+                    with (.weak) {
                         nowAndEvery { val.alternating } do: {
                             val.res1 = true
                         }
                     }
-                    weak {
+                    with (.weak) {
                         every { val.alternating } do: {
                             val.res2 = true
                         }
                     }
-                    weak {
+                    with (.weak) {
                         always {
                             XCTAssertEqual(val.expected1 as Bool, val.res1)
                             XCTAssertEqual(val.expected2 as Bool, val.res2)
@@ -603,7 +603,7 @@ final class PappeTests: XCTestCase {
             activity (name.Main, []) { val in
                 exec { val.result = Int(0) }
                 cobegin {
-                    strong {
+                    with {
                         exec {
                             val.target = "Target1"
                             val.expected = Int(1)
@@ -615,12 +615,12 @@ final class PappeTests: XCTestCase {
                         }
                         pause
                     }
-                    weak {
+                    with (.weak) {
                         `repeat` {
                             Pappe.run (name.Meta, [val.target], [val.loc.result])
                         }
                     }
-                    weak {
+                    with (.weak) {
                         always {
                             XCTAssertEqual(val.result as Int, val.expected as Int)
                         }
@@ -692,15 +692,15 @@ final class PappeTests: XCTestCase {
                     val.j = 0
                 }
                 cobegin {
-                    strong {
+                    with {
                         always {
                             val.i += 1
                         }
                     }
-                    strong {
+                    with {
                         Pappe.run (name.A, [val.i], [val.loc.j])
                     }
-                    strong {
+                    with {
                         always {
                             XCTAssertEqual(val.i, val.j as Int)
                         }
@@ -718,17 +718,17 @@ final class PappeTests: XCTestCase {
                     val.o = false
                 }
                 cobegin {
-                    weak {
+                    with {
                         pause
                         exec { val.i = 1 }
                     }
-                    strong {
+                    with {
                         when { val.i as Int != val.prev.i } abort: {
                             halt
                         }
                         exec { val.o = true }
                     }
-                    weak {
+                    with {
                         exec { XCTAssertFalse(val.o) }
                         pause
                         exec { XCTAssertTrue(val.o) }
