@@ -27,7 +27,7 @@ public class DirectLoc : Loc {
 
 struct CtxLoc : Loc {
     let name: String
-    var ctx: Ctx
+    unowned var ctx: Ctx
     
     var val: Any {
         get {
@@ -42,7 +42,7 @@ struct CtxLoc : Loc {
 /// Creates a location for a given variable name.
 @dynamicMemberLookup
 public struct Locs {
-    let ctx: Ctx
+    unowned let ctx: Ctx
     
     /// Creates the location from a variable name given by member lookup.
     public subscript(dynamicMember name: String) -> Loc {
