@@ -4,7 +4,7 @@ An embedded interpreted synchronous DSL for Swift.
 
 ## Background
 
-This Swift Package allows you to experiment with synchronous programming in Swift. It follows the imperative synchronous programming language [Blech](https://blech-lang.org) and tries to recreate parts of it as an embedded interpreted DSL using the Swift `functionBuilders`.
+This Swift Package allows you to experiment with synchronous programming in Swift. It follows the imperative synchronous programming language [Blech](https://blech-lang.org) and tries to recreate parts of it as an embedded interpreted DSL using the Swift `resultBuilders`.
 
 The imperative synchronous approach allows preemption and concurrency in a structured and modular way.
 
@@ -23,17 +23,17 @@ let m = Module { name in
     }
     activity (name.Main, []) { val in
         cobegin {
-            strong {
+            with {
                 run (name.Wait, [10])
             }
-            weak {
+            with (.weak) {
                 `repeat` {
                     run (name.Wait, [2])
                     exec { print("on every third") }
                     pause
                 }
             }
-            weak {
+            with (.weak) {
                 `repeat` {
                     run (name.Wait, [1])
                     exec { print("on every second") }
