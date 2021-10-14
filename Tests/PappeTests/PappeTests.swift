@@ -293,6 +293,66 @@ final class PappeTests: XCTestCase {
         }.test(steps: 10)
     }
     
+    func testSuspend() {
+        Module { name in
+            activity (name.Main, []) { val in
+                exec {
+                    val.i = 0
+                }
+                cobegin {
+                    with {
+                        exec {
+                            val.cond = false
+                            val.o = 1
+                        }
+                        pause
+                        exec {
+                            val.cond = true
+                            val.o = 1
+                        }
+                        pause
+                        exec {
+                            val.cond = false
+                            val.o = 2
+                        }
+                        pause
+                        exec {
+                            val.cond = true
+                            val.o = 2
+                        }
+                        pause
+                        exec {
+                            val.cond = true
+                            val.o = 2
+                        }
+                        pause
+                        exec {
+                            val.cond = false
+                            val.o = 3
+                        }
+                    }
+                    with (.weak) {
+                        when { val.cond } suspend: {
+                            `repeat` {
+                                exec { val.i = 1 }
+                                pause
+                                exec { val.i = 2 }
+                                pause
+                                exec { val.i = 3 }
+                                pause
+                            }
+                        }
+                    }
+                    with (.weak) {
+                        always {
+                            XCTAssertEqual(val.i, val.o as Int)
+                        }
+                    }
+                }
+            }
+        }.test(steps: 10)
+    }
+    
     func testReset() {
         Module { name in
             activity (name.Main, []) { val in
@@ -844,6 +904,7 @@ final class PappeTests: XCTestCase {
         ("testAbort", testAbort),
         ("testAbortPrecedence", testAbortPrecedence),
         ("testReset", testReset),
+        ("testSuspend", testSuspend),
         ("testDefer", testDefer),
         ("testDeferInMain", testDeferInMain),
         ("testSelectAndIf", testSelectAndIf),

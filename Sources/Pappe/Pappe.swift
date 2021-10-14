@@ -145,11 +145,16 @@ public enum Stmt {
     case run(SFunc, MFunc, MLFunc, ResFunc?)
     case cobegin([Trail], parallel: Bool)
     case repeatUntil([Stmt], Cond)
-    case whenAbort(Cond, [Stmt])
+    case when(WhenType, Cond, [Stmt])
     case select([Match])
     case exec(Proc)
     case `defer`(Proc)
     case exit(Func)
+}
+
+public enum WhenType {
+    case abort
+    case suspend
 }
 
 /// Options for a trail.
@@ -279,15 +284,20 @@ public func `repeat`(@StmtBuilder _ builder: () -> [Stmt], until cond: @escaping
 
 /// Checks `cond` on every step and aborts the body if `true`.
 public func when(_ cond: @escaping Cond, @StmtBuilder abort builder: () -> [Stmt]) -> Stmt {
-    Stmt.whenAbort(cond, builder())
+    Stmt.when(.abort, cond, builder())
 }
 
 /// Checks `cond` on every step and restarts the body if `true`.
 public func when(_ cond: @escaping Cond, @StmtBuilder reset builder: () -> [Stmt]) -> Stmt {
     var done = false
     return `repeat` {
-        Stmt.whenAbort(cond, builder() + [exec { done = true }])
+        Stmt.when(.abort, cond, builder() + [exec { done = true }])
     } until: { done }
+}
+
+/// Checks `cond` on every step and suspends the body if `true`.
+public func when(_ cond: @escaping Cond, @StmtBuilder suspend builder: () -> [Stmt]) -> Stmt {
+    Stmt.when(.suspend, cond, builder())
 }
 
 /// Runs the statements of the first match with a `true` condition.
@@ -635,11 +645,11 @@ class BlockProcessor {
                     return res
                 }
 
-            case let .whenAbort(cond, stmts):
+            case let .when(type, cond, stmts):
                 if subProc == nil {
-                    subProc = AbortProcessor(cond: cond, stmts: stmts, procCtx: procCtx)
+                    subProc = WhenProcessor(type: type, cond: cond, stmts: stmts, procCtx: procCtx)
                 }
-                let res = try (subProc as! AbortProcessor).tick()
+                let res = try (subProc as! WhenProcessor).tick()
                 if res == .wait {
                     return res
                 }
@@ -859,12 +869,14 @@ class WhileProcessor {
     }
 }
 
-class AbortProcessor {
+class WhenProcessor {
+    private let t: WhenType
     private let c: Cond
     private let bp: BlockProcessor
     private var check = false
     
-    init(cond: @escaping Cond, stmts: [Stmt], procCtx: ProcessorCtx) {
+    init(type: WhenType, cond: @escaping Cond, stmts: [Stmt], procCtx: ProcessorCtx) {
+        t = type
         c = cond
         bp = BlockProcessor(stmts: stmts, procCtx: procCtx)
     }
@@ -872,7 +884,12 @@ class AbortProcessor {
     func tick() throws -> TickResult {
         if check {
             if c() {
-                return .done
+                switch t {
+                case .abort:
+                    return .done
+                case .suspend:
+                    return .wait
+                }
             }
         }
         let res = try bp.tick()
