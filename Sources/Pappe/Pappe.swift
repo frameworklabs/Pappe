@@ -78,14 +78,15 @@ public class PrevCtx
 @dynamicMemberLookup
 public class Ctx {
     private var map: [String: Any] = [:]
+    private var presencables: [Presencable] = []
     private let semaphore = DispatchSemaphore(value: 1)
     
     /// Access to the location factory.
     public lazy var loc: Locs = Locs(ctx: self)
     
     /// Access to the previous context values.
-    public let prev: PrevCtx =  PrevCtx();
-        
+    public let prev: PrevCtx = PrevCtx();
+            
     /// Get and set a variable by member lookup.
     public subscript<T>(dynamicMember name: String) -> T {
         get {
@@ -99,6 +100,9 @@ public class Ctx {
         set {
             synchronized {
                 map[name] = newValue
+                if let presencable = newValue as? Presencable {
+                    presencables.append(presencable)
+                }
             }
         }
     }
@@ -108,12 +112,78 @@ public class Ctx {
             prev.map = map
         }
     }
+    
+    func makeAbsent() {
+        synchronized {
+            for presencable in presencables {
+                presencable.makeAbsent()
+            }
+        }
+    }
 
     private func synchronized<T>(_ f: () -> T) -> T {
         semaphore.wait()
         defer { semaphore.signal() }
         return f()
     }
+}
+
+/// Types adopting this protocol have a state  of being  present or absent.
+///
+/// On every tick start objects with this marker will made absent again.
+public protocol Presencable : AnyObject {
+    var isPresent: Bool { get }
+    func makeAbsent()
+}
+
+/// A simple boolean signal which is either present or absent.
+public class Signal : Presencable {
+    public private(set) var isPresent = false
+    
+    /// Emits the signal thus making it present.
+    public func emit() {
+        isPresent = true
+    }
+    
+    public func makeAbsent() {
+        isPresent = false
+    }
+}
+
+/// A signal which bears a value
+public class ValueSignal<T> : Presencable {
+    public private(set) var isPresent = false
+    
+    /// Access to the emitted value.
+    public private(set) var val: T?
+    
+    /// Emits the signal with the given value thus making it present.
+    public func emit(_ val: T) {
+        self.val = val
+        isPresent = true
+    }
+    
+    public func makeAbsent() {
+        isPresent = false
+    }
+}
+
+/// Helper which asks the presence status of an object retrieved from a context.
+public func present(_ any: Any) -> Bool {
+    guard let presencable = any as? Presencable else { return false }
+    return presencable.isPresent
+}
+
+/// Helper which calls emit() on a signal retrieved from a context.
+public func emit(_ any: Any) {
+    let signal = any as! Signal
+    signal.emit()
+}
+
+/// Helper which calls emit() with a value on a signal retrieved from a context.
+public func emit<T>(_ any: Any, _ val: T) {
+    let signal = any as! ValueSignal<T>
+    signal.emit(val)
 }
 
 /// Converts a member-lookup into a string.
@@ -519,6 +589,7 @@ class ActivityProcessor {
     
     func tick(_ inArgs: [Any], _ outArgs: [Loc]) throws -> TickResult {
         ctx.setPrevFromNow()
+        ctx.makeAbsent()
         act.bindInArgs(inArgs, ctx)
         act.bindInOutArgs(outArgs, ctx)
         let res = try bp.tick()

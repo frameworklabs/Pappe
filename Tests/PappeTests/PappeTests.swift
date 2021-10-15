@@ -895,7 +895,53 @@ final class PappeTests: XCTestCase {
             }
         }.test(steps: 10)
     }
-
+    
+    func testSignal() {
+        Module { name in
+            activity (name.Main, []) { val in
+                exec {
+                    val.sig = Signal()
+                    val.vsig = ValueSignal<Int>()
+                }
+                cobegin {
+                    with {
+                        exec {
+                            val.p = false
+                            val.v = nil as Int?
+                        }
+                        pause
+                        exec {
+                            emit(val.sig)
+                            emit(val.vsig, 1)
+                            val.p = true
+                            val.v = 1
+                        }
+                        pause
+                        exec {
+                            val.p = false
+                            val.v = 1
+                        }
+                        pause
+                        exec {
+                            emit(val.sig)
+                            emit(val.vsig, 2)
+                            val.p = true
+                            val.v = 2
+                        }
+                    }
+                    with (.weak) {
+                        always {
+                            XCTAssertEqual(present(val.sig), val.p)
+                            XCTAssertEqual(present(val.vsig), val.p)
+                            let vsig: ValueSignal<Int> = val.vsig
+                            XCTAssertEqual(vsig.val, val.v)
+                        }
+                    }
+                }
+            }
+        }.test(steps: 10)
+    }
+    
     static var allTests = [
         ("testAwait", testAwait),
         ("testReturn", testReturn),
@@ -916,5 +962,6 @@ final class PappeTests: XCTestCase {
         ("testPrev3", testPrev3),
         ("testPar", testPar),
         ("testParPrev", testParPrev),
+        ("testSignal", testSignal),
     ]
 }
