@@ -130,7 +130,7 @@ public class Ctx {
 
 /// Types adopting this protocol have a state  of being  present or absent.
 ///
-/// On every tick start objects with this marker will made absent again.
+/// On every tick start, objects with this marker will be made absent again.
 public protocol Presencable : AnyObject {
     var isPresent: Bool { get }
     func makeAbsent()
@@ -150,7 +150,7 @@ public class Signal : Presencable {
     }
 }
 
-/// A signal which bears a value
+/// A signal which bears a value and is in addition either present or absent.
 public class ValueSignal<T> : Presencable {
     public private(set) var isPresent = false
     
@@ -169,21 +169,23 @@ public class ValueSignal<T> : Presencable {
 }
 
 /// Helper which asks the presence status of an object retrieved from a context.
-public func present(_ any: Any) -> Bool {
-    guard let presencable = any as? Presencable else { return false }
+public func present(_ presencable: Presencable) -> Bool {
     return presencable.isPresent
 }
 
 /// Helper which calls emit() on a signal retrieved from a context.
-public func emit(_ any: Any) {
-    let signal = any as! Signal
-    signal.emit()
+public func emit(_ sig: Signal) {
+    sig.emit()
 }
 
 /// Helper which calls emit() with a value on a signal retrieved from a context.
-public func emit<T>(_ any: Any, _ val: T) {
-    let signal = any as! ValueSignal<T>
-    signal.emit(val)
+public func emit<T>(_ sig: ValueSignal<T>, with val: T) {
+    sig.emit(val)
+}
+
+/// Helper which returns the value stored in a `ValueSignal`retrieved from a context.
+public func emittedValue<T>(_ sig: ValueSignal<T>, as ty: T.Type) -> T? {
+    sig.val
 }
 
 /// Converts a member-lookup into a string.
@@ -428,6 +430,20 @@ public func nowAndEvery(_ cond: @escaping Cond, do proc: @escaping Proc) -> Stmt
 /// 'Unofficial'' statement which executes given one-step code now and every following step.
 public func always(_ proc: @escaping Proc) -> Stmt {
     Stmt.repeatUntil([Stmt.exec(proc), Stmt.await(trueCond)], falseCond)
+}
+
+/// Emits the specified `Signal` on every tick.
+public func sustain(_ sig: @escaping () -> Signal) -> Stmt {
+    always {
+        emit(sig())
+    }
+}
+
+/// Emits the specified `ValueSignal` with the given value on every tick.
+public func sustain<T>(_ sig: @escaping () -> ValueSignal<T>, with val: @escaping () -> T) -> Stmt {
+    always {
+        emit(sig(), with: val())
+    }
 }
 
 /// 'Unofficial'' statement which pauses until the next step. Equivalent to `await { true }`.

@@ -902,6 +902,8 @@ final class PappeTests: XCTestCase {
                 exec {
                     val.sig = Signal()
                     val.vsig = ValueSignal<Int>()
+                    val.ssig = Signal()
+                    val.svsig = ValueSignal<String>()
                 }
                 cobegin {
                     with {
@@ -912,7 +914,7 @@ final class PappeTests: XCTestCase {
                         pause
                         exec {
                             emit(val.sig)
-                            emit(val.vsig, 1)
+                            emit(val.vsig, with: 1)
                             val.p = true
                             val.v = 1
                         }
@@ -924,17 +926,25 @@ final class PappeTests: XCTestCase {
                         pause
                         exec {
                             emit(val.sig)
-                            emit(val.vsig, 2)
+                            emit(val.vsig, with: 2)
                             val.p = true
                             val.v = 2
                         }
                     }
                     with (.weak) {
+                        sustain { val.ssig }
+                    }
+                    with (.weak) {
+                        sustain { val.svsig } with: { "x" }
+                    }
+                    with (.weak) {
                         always {
                             XCTAssertEqual(present(val.sig), val.p)
                             XCTAssertEqual(present(val.vsig), val.p)
-                            let vsig: ValueSignal<Int> = val.vsig
-                            XCTAssertEqual(vsig.val, val.v)
+                            XCTAssertEqual(emittedValue(val.vsig, as: Int.self), val.v)
+                            XCTAssertTrue(present(val.ssig))
+                            XCTAssertTrue(present(val.svsig))
+                            XCTAssertEqual(emittedValue(val.svsig, as: String.self), "x")
                         }
                     }
                 }
