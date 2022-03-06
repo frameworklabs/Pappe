@@ -54,6 +54,8 @@ For more extensive code examples, please have a look at:
 
 The documentation of the SynchrosphereDemos can be seen as a [tutorial](https://github.com/frameworklabs/SynchrosphereDemo/blob/main/README.md#io-demos) for the Pappe language, as it explains its language constructs with concrete examples.
 
+Finally, if you like the imperative synchronous programming concept, you might also be intrested in the [proto_activities](https://github.com/frameworklabs/proto_activities) project for embedded systems.
+
 ## Caveats
 
 The Pappe DSL is more of a proof of concept. It has many shortcomings like:
